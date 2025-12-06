@@ -115,7 +115,9 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         // Service control button
         binding.buttonToggleService.setOnClickListener {
             if (YggmailService.isRunning) {
-                YggmailService.stop(this)
+                // Perform soft stop instead of immediate stop
+                // This gracefully disconnects peers before stopping to avoid ErrClosed errors
+                yggmailService?.softStop()
             } else {
                 YggmailService.start(this)
             }

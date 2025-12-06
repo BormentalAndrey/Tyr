@@ -24,6 +24,8 @@ import com.jbselfcompany.tyr.ui.MainActivity
 import mobile.LogCallback
 import mobile.YggmailService as MobileYggmailService
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Foreground service that runs Yggmail server.
@@ -157,8 +159,15 @@ class YggmailService : Service(), LogCallback {
                 }
             }
             ACTION_STOP -> {
-                stopYggmail()
-                stopSelf()
+                // Post stopSelf() to happen AFTER stopYggmail completes on serviceHandler thread
+                // This prevents race condition where onDestroy() is called while stop is in progress
+                serviceHandler.post {
+                    stopYggmailSync()
+                    // Call stopSelf on main thread after cleanup completes
+                    mainHandler.post {
+                        stopSelf()
+                    }
+                }
             }
             else -> {
                 // Service restarted by system
@@ -182,9 +191,34 @@ class YggmailService : Service(), LogCallback {
         // Cancel WakeLock renewal
         wakeLockRenewalRunnable?.let { serviceHandler.removeCallbacks(it) }
 
-        stopYggmail()
+        // Only stop if not already stopped (prevent duplicate stop calls)
+        if (isRunning) {
+            Log.w(TAG, "Service destroyed while still running - forcing cleanup")
+            // Post to handler and wait for completion to avoid race conditions
+            val latch = java.util.concurrent.CountDownLatch(1)
+            serviceHandler.post {
+                try {
+                    stopYggmailSync()
+                } finally {
+                    latch.countDown()
+                }
+            }
+            // Wait up to 5 seconds for cleanup to complete
+            try {
+                latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            } catch (e: InterruptedException) {
+                Log.e(TAG, "Interrupted while waiting for service cleanup", e)
+            }
+        }
 
+        // Now safe to quit the thread
         serviceThread.quitSafely()
+        try {
+            // Wait for thread to actually terminate (max 2 seconds)
+            serviceThread.join(2000)
+        } catch (e: InterruptedException) {
+            Log.e(TAG, "Interrupted while waiting for service thread termination", e)
+        }
 
         releaseWakeLock()
 
@@ -286,6 +320,8 @@ class YggmailService : Service(), LogCallback {
 
     /**
      * Stop Yggmail service on background thread
+     * Note: For normal stop operations, use ACTION_STOP intent instead.
+     * This method is kept for backward compatibility and emergency cleanup.
      */
     private fun stopYggmail() {
         serviceHandler.post {
@@ -295,52 +331,178 @@ class YggmailService : Service(), LogCallback {
 
     /**
      * Synchronous stop logic (called from handler thread)
+     * Thread-safe with proper exception handling for native library cleanup
+     * Includes comprehensive panic/crash recovery for native library issues
      */
     private fun stopYggmailSync() {
-        try {
-            Log.i(TAG, "Stopping Yggmail service...")
-            updateStatus(ServiceStatus.STOPPING)
+        // Prevent concurrent stop operations
+        synchronized(this) {
+            if (!isRunning) {
+                Log.w(TAG, "Service already stopped, ignoring stop request")
+                return
+            }
 
-            // Cancel WakeLock renewal
+            // Mark as stopping immediately to prevent new operations
+            isRunning = false
+            updateStatus(ServiceStatus.STOPPING)
+            Log.i(TAG, "Stopping Yggmail service...")
+        }
+
+        // Track if cleanup was successful
+        var cleanupSuccessful = false
+        var stopError: Throwable? = null
+        var closeError: Throwable? = null
+
+        try {
+            // Cancel WakeLock renewal first (before any blocking operations)
             wakeLockRenewalRunnable?.let { serviceHandler.removeCallbacks(it) }
 
-            // Stop and close service
-            yggmailService?.stop()
-            Thread.sleep(500) // Give time for stop to process
+            // Acquire WakeLock for shutdown process to prevent interruption
+            // This is critical to ensure complete cleanup
+            acquireWakeLockWithTimeout(15000) // 15 second timeout for shutdown
 
-            yggmailService?.close()
-            Thread.sleep(500) // Give time for close to process
+            // Step 1: Stop the service (closes network connections)
+            // Wrap in try-catch for ALL throwables (including native crashes/panics)
+            try {
+                yggmailService?.let { service ->
+                    Log.d(TAG, "Calling native stop()...")
 
+                    // Call stop() in a timeout-protected block
+                    val stopLatch = CountDownLatch(1)
+                    var stopResult: Throwable? = null
+
+                    val stopThread = Thread {
+                        try {
+                            service.stop()
+                            Log.d(TAG, "Native stop() completed successfully")
+                        } catch (t: Throwable) {
+                            stopResult = t
+                            Log.e(TAG, "Exception during native stop()", t)
+                        } finally {
+                            stopLatch.countDown()
+                        }
+                    }
+
+                    stopThread.name = "YggmailStopThread"
+                    stopThread.start()
+
+                    // Wait with timeout
+                    if (!stopLatch.await(10, TimeUnit.SECONDS)) {
+                        Log.e(TAG, "Native stop() timed out after 10 seconds")
+                        stopThread.interrupt()
+                        stopError = Exception("Native stop() timeout")
+                    } else if (stopResult != null) {
+                        stopError = stopResult
+                    }
+
+                    // Give network connections time to close gracefully
+                    Thread.sleep(500)
+                }
+            } catch (t: Throwable) {
+                // Catch ALL throwables including crashes from native code
+                stopError = t
+                Log.e(TAG, "Critical error calling native stop()", t)
+                // Continue with close() even if stop() failed critically
+            }
+
+            // Step 2: Close the service (releases all resources)
+            // Only attempt close if we still have a valid reference
+            try {
+                yggmailService?.let { service ->
+                    Log.d(TAG, "Calling native close()...")
+
+                    // Call close() in a timeout-protected block
+                    val closeLatch = CountDownLatch(1)
+                    var closeResult: Throwable? = null
+
+                    val closeThread = Thread {
+                        try {
+                            service.close()
+                            Log.d(TAG, "Native close() completed successfully")
+                        } catch (t: Throwable) {
+                            closeResult = t
+                            Log.e(TAG, "Exception during native close()", t)
+                        } finally {
+                            closeLatch.countDown()
+                        }
+                    }
+
+                    closeThread.name = "YggmailCloseThread"
+                    closeThread.start()
+
+                    // Wait with timeout
+                    if (!closeLatch.await(5, TimeUnit.SECONDS)) {
+                        Log.e(TAG, "Native close() timed out after 5 seconds")
+                        closeThread.interrupt()
+                        closeError = Exception("Native close() timeout")
+                    } else if (closeResult != null) {
+                        closeError = closeResult
+                    }
+
+                    // Give Go runtime time to finalize
+                    Thread.sleep(500)
+                }
+            } catch (t: Throwable) {
+                // Catch ALL throwables including crashes from native code
+                closeError = t
+                Log.e(TAG, "Critical error calling native close()", t)
+                // Continue cleanup even if close() failed critically
+            }
+
+            // Step 3: Clear reference to native service
             yggmailService = null
 
-            // Force garbage collection to help release Go resources
+            // Step 4: Force garbage collection to help release Go resources
+            // This is important for gomobile-generated code
+            Log.d(TAG, "Requesting garbage collection...")
             System.gc()
             System.runFinalization()
 
-            // Wait for ports to be fully released (increased to 3000ms)
-            Thread.sleep(3000)
+            // Step 5: Wait for ports to be fully released
+            // TCP sockets may remain in TIME_WAIT state
+            Log.d(TAG, "Waiting for port release...")
+            Thread.sleep(1000)
 
+            cleanupSuccessful = (stopError == null && closeError == null)
+            Log.i(TAG, "Yggmail service stopped (cleanup ${if (cleanupSuccessful) "successful" else "with errors"})")
+
+        } catch (t: Throwable) {
+            // Final catch-all for any unexpected issues
+            Log.e(TAG, "Unexpected critical error during service shutdown", t)
+            lastError = "Critical shutdown error: ${t.message}"
+        } finally {
+            // Always release WakeLock in finally block
             releaseWakeLock()
 
-            isRunning = false
-            updateStatus(ServiceStatus.STOPPED)
+            // Always clear service reference to prevent future use
+            yggmailService = null
+
+            // Update status based on cleanup result
+            if (cleanupSuccessful) {
+                lastError = null
+                updateStatus(ServiceStatus.STOPPED)
+            } else {
+                lastError = buildString {
+                    append("Service stopped with errors")
+                    stopError?.let { append(". Stop: ${it.javaClass.simpleName}: ${it.message}") }
+                    closeError?.let { append(". Close: ${it.javaClass.simpleName}: ${it.message}") }
+                }
+                updateStatus(ServiceStatus.ERROR)
+            }
 
             // Remove foreground notification when stopped
             mainHandler.post {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
+                try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error removing foreground notification", e)
                 }
             }
-
-            Log.i(TAG, "Yggmail service stopped")
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Error stopping Yggmail service", e)
-            lastError = e.message
-            updateStatus(ServiceStatus.ERROR)
         }
     }
 
@@ -748,6 +910,41 @@ class YggmailService : Service(), LogCallback {
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error updating peers", e)
+            }
+        }
+    }
+
+    /**
+     * Soft stop: Gracefully disconnect peers before stopping the service
+     * This method disconnects all peers cleanly to avoid ErrClosed errors in logs
+     *
+     * Unlike immediate stop, this approach:
+     * - First disconnects all peers using updatePeers("") - empty peer list
+     * - Gives time for graceful disconnection
+     * - Then performs normal service shutdown
+     * - Avoids ErrClosed errors in logs
+     */
+    fun softStop() {
+        serviceHandler.post {
+            try {
+                Log.i(TAG, "Performing soft stop...")
+                updateStatus(ServiceStatus.STOPPING)
+
+                // First, gracefully disconnect all peers by updating to empty peer list
+                // This uses Yggdrasil Core's RemovePeer for clean disconnection
+                yggmailService?.updatePeers("")
+                Log.i(TAG, "All peers disconnected gracefully")
+
+                // Give a short delay for graceful disconnection to complete
+                Thread.sleep(500)
+
+                // Now perform normal stop
+                stopYggmailSync()
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during soft stop, falling back to normal stop", e)
+                // Fallback to normal stop if soft stop fails
+                stopYggmailSync()
             }
         }
     }
