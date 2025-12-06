@@ -1,0 +1,4 @@
+• Reworked peer control menu
+• Removed multicast
+• Fixed bug causing service to stop and app to close
+• Optimized battery consumption
