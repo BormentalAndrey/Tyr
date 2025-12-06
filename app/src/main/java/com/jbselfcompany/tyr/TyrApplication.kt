@@ -34,6 +34,8 @@ class TyrApplication : Application() {
     var yggmailServiceBinder: com.jbselfcompany.tyr.service.YggmailService.LocalBinder? = null
 
     private var networkCallback: NetworkChangeReceiver? = null
+    private val networkCallbackHandler = Handler(Looper.getMainLooper())
+    private var networkCallbackRunnable: Runnable? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -48,12 +50,25 @@ class TyrApplication : Application() {
         // Create notification channels
         createNotificationChannels()
 
-        // Register network callback after 15-second delay (battery optimization)
-        val handler = Handler(Looper.getMainLooper())
-        handler.postDelayed({
+        // Only register network callback if service is enabled and auto-start is on
+        // Battery optimization: Don't monitor network if service won't be running
+        if (configRepository.isServiceEnabled() && configRepository.isAutoStartEnabled()) {
+            scheduleNetworkCallbackRegistration()
+        }
+    }
+
+    private fun scheduleNetworkCallbackRegistration() {
+        networkCallbackRunnable = Runnable {
             networkCallback = NetworkChangeReceiver(this)
             networkCallback?.register()
-        }, 15000) // 15 seconds delay
+        }
+        networkCallbackHandler.postDelayed(networkCallbackRunnable!!, 15000)
+    }
+
+    fun cancelNetworkCallbackRegistration() {
+        networkCallbackRunnable?.let {
+            networkCallbackHandler.removeCallbacks(it)
+        }
     }
 
     override fun attachBaseContext(base: Context) {
@@ -62,6 +77,8 @@ class TyrApplication : Application() {
     }
 
     override fun onTerminate() {
+        // Cancel pending network callback registration
+        cancelNetworkCallbackRegistration()
         // Unregister network callback
         networkCallback?.unregister()
         super.onTerminate()

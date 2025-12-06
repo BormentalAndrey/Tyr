@@ -50,16 +50,34 @@ class MessageRetryWorker(
                 .putInt(INPUT_RETRY_COUNT, retryCount)
                 .build()
 
-            // Battery-friendly constraints
-            val constraints = Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)  // Only run when network available
-                .setRequiresBatteryNotLow(true)  // Don't drain battery when low
-                .build()
+            // Adaptive constraints based on retry count
+            // Early retries (< 3): Less restrictive for faster delivery
+            // Later retries (>= 3): More restrictive to save battery
+            val constraints = if (retryCount < 3) {
+                // Urgent retries - any network, battery not low
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiresBatteryNotLow(true)
+                    .build()
+            } else {
+                // Deferred retries - WiFi only, charging, device idle
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.UNMETERED)  // WiFi only
+                    .setRequiresBatteryNotLow(true)
+                    .setRequiresCharging(true)  // Only when charging
+                    .setRequiresDeviceIdle(true)  // Only when device idle
+                    .build()
+            }
 
             val retryWork = OneTimeWorkRequestBuilder<MessageRetryWorker>()
                 .setInputData(inputData)
                 .setInitialDelay(backoffDelay, TimeUnit.SECONDS)
                 .setConstraints(constraints)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    WorkRequest.MIN_BACKOFF_MILLIS,
+                    TimeUnit.MILLISECONDS
+                )
                 .addTag("message_retry")
                 .addTag("destination_$destination")
                 .build()
@@ -71,7 +89,8 @@ class MessageRetryWorker(
                     retryWork
                 )
 
-            Log.d(TAG, "[Battery Optimization] Scheduled retry for $destination in $backoffDelay seconds (attempt $retryCount)")
+            val constraintType = if (retryCount < 3) "urgent" else "deferred"
+            Log.d(TAG, "[Battery Optimization] Scheduled $constraintType retry for $destination in $backoffDelay seconds (attempt $retryCount)")
         }
 
         /**

@@ -19,7 +19,7 @@ class NetworkStatsMonitor(private val context: Context) {
 
     companion object {
         private const val TAG = "NetworkStatsMonitor"
-        private const val UPDATE_INTERVAL_MS = 3000L // Update every 3 seconds
+        private const val UPDATE_INTERVAL_MS = 10000L // Update every 10 seconds (battery optimization)
     }
 
     interface NetworkStatsListener {
@@ -40,7 +40,8 @@ class NetworkStatsMonitor(private val context: Context) {
     )
 
     private val handler = Handler(Looper.getMainLooper())
-    private val backgroundHandler = Handler(android.os.HandlerThread("NetworkStatsMonitor").apply { start() }.looper)
+    private var backgroundThread: android.os.HandlerThread? = null
+    private var backgroundHandler: Handler? = null
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private var isMonitoring = false
@@ -51,9 +52,9 @@ class NetworkStatsMonitor(private val context: Context) {
         override fun run() {
             if (isMonitoring) {
                 // Run stats update in background thread
-                backgroundHandler.post {
+                backgroundHandler?.post {
                     updateStats()
-                }
+                } ?: Log.w(TAG, "Background handler is null, skipping update")
                 handler.postDelayed(this, UPDATE_INTERVAL_MS)
             }
         }
@@ -67,6 +68,12 @@ class NetworkStatsMonitor(private val context: Context) {
             Log.w(TAG, "Already monitoring")
             return
         }
+
+        // Create and start background thread
+        backgroundThread = android.os.HandlerThread("NetworkStatsMonitor").apply {
+            start()
+        }
+        backgroundHandler = Handler(backgroundThread!!.looper)
 
         this.listener = listener
         this.measureLatency = enableLatencyMeasurement
@@ -89,6 +96,12 @@ class NetworkStatsMonitor(private val context: Context) {
         isMonitoring = false
         handler.removeCallbacks(updateRunnable)
         listener = null
+
+        // Properly stop background thread
+        backgroundHandler?.removeCallbacksAndMessages(null)
+        backgroundThread?.quitSafely()
+        backgroundThread = null
+        backgroundHandler = null
 
         Log.d(TAG, "Network monitoring stopped")
     }

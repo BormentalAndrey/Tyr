@@ -550,12 +550,16 @@ class YggmailService : Service(), LogCallback {
                     serviceHandler.postDelayed(wakeLockRenewalRunnable!!, WAKELOCK_IDLE_TIMEOUT_MS / 2)
                 }
 
-                // Idle - release WakeLock, rely on network events
+                // Idle - release WakeLock, stop scheduling until activity resumes
                 else -> {
                     releaseWakeLock()
-                    Log.d(TAG, "[Battery Optimization] Service idle - WakeLock released to save battery")
-                    // Schedule next check in 1 minute
-                    serviceHandler.postDelayed(wakeLockRenewalRunnable!!, 60 * 1000L)
+                    Log.d(TAG, "[Battery Optimization] Service idle - WakeLock released, scheduling stopped")
+                    // DO NOT schedule next check - let network events wake us up
+                    // The service will be reactivated by:
+                    // 1. setAppActive(true) when app comes to foreground
+                    // 2. notifyMessageSendStarted() when mail activity occurs
+                    // 3. Network events from Yggdrasil library
+                    return@Runnable // Stop the renewal loop
                 }
             }
         }
@@ -592,7 +596,12 @@ class YggmailService : Service(), LogCallback {
 
         serviceHandler.post {
             acquireWakeLockWithTimeout(WAKELOCK_SEND_TIMEOUT_MS)
-            Log.d(TAG, "[Battery Optimization] Send started - WakeLock acquired")
+            // Restart renewal cycle if it was stopped
+            wakeLockRenewalRunnable?.let {
+                serviceHandler.removeCallbacks(it)
+                serviceHandler.postDelayed(it, WAKELOCK_SEND_TIMEOUT_MS / 2)
+            }
+            Log.d(TAG, "[Battery Optimization] Send started - WakeLock acquired, renewal restarted")
         }
     }
 
@@ -868,6 +877,11 @@ class YggmailService : Service(), LogCallback {
                 lastSendActivity = System.currentTimeMillis()
                 serviceHandler.post {
                     acquireWakeLockWithTimeout(WAKELOCK_IDLE_TIMEOUT_MS)
+                    // Restart renewal cycle if it was stopped
+                    wakeLockRenewalRunnable?.let {
+                        serviceHandler.removeCallbacks(it)
+                        serviceHandler.postDelayed(it, WAKELOCK_IDLE_TIMEOUT_MS / 2)
+                    }
                 }
             }
         } catch (e: Exception) {

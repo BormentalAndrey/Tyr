@@ -6,6 +6,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.jbselfcompany.tyr.service.YggmailService
 
@@ -23,10 +25,16 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
     }
 
     private var lastNetworkChangeTime = 0L
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingNetworkAvailableCheck: Runnable? = null
+    private var pendingNetworkLostCheck: Runnable? = null
 
     override fun onAvailable(network: Network) {
         super.onAvailable(network)
         Log.d(TAG, "Network available: $network")
+
+        // Cancel any pending check
+        pendingNetworkAvailableCheck?.let { handler.removeCallbacks(it) }
 
         // Debounce: prevent multiple rapid calls
         val now = System.currentTimeMillis()
@@ -36,22 +44,24 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
         }
         lastNetworkChangeTime = now
 
-        // Delay to allow network to stabilize
-        Thread {
-            Thread.sleep(DEBOUNCE_DELAY_MS)
-
+        // Schedule check using Handler instead of Thread
+        pendingNetworkAvailableCheck = Runnable {
             if (YggmailService.isRunning) {
                 Log.i(TAG, "Network became available - Yggdrasil will auto-reconnect")
                 // Note: Yggdrasil core handles peer reconnection automatically
                 // We don't need to manually restart transport (prevents ErrClosed errors)
             }
-        }.start()
+        }
+        handler.postDelayed(pendingNetworkAvailableCheck!!, DEBOUNCE_DELAY_MS)
     }
 
     override fun onLost(network: Network) {
         super.onLost(network)
         Log.d(TAG, "Network lost: $network")
 
+        // Cancel any pending check
+        pendingNetworkLostCheck?.let { handler.removeCallbacks(it) }
+
         // Debounce: prevent multiple rapid calls
         val now = System.currentTimeMillis()
         if (now - lastNetworkChangeTime < DEBOUNCE_DELAY_MS) {
@@ -60,15 +70,14 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
         }
         lastNetworkChangeTime = now
 
-        // Check if we still have any network connectivity
-        Thread {
-            Thread.sleep(DEBOUNCE_DELAY_MS)
-
+        // Schedule check using Handler instead of Thread
+        pendingNetworkLostCheck = Runnable {
             if (!hasNetworkConnectivity(context)) {
                 Log.w(TAG, "All networks lost")
                 // Service will handle disconnection gracefully
             }
-        }.start()
+        }
+        handler.postDelayed(pendingNetworkLostCheck!!, DEBOUNCE_DELAY_MS)
     }
 
     override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
@@ -113,6 +122,12 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
      */
     fun unregister() {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // Clean up pending callbacks
+        pendingNetworkAvailableCheck?.let { handler.removeCallbacks(it) }
+        pendingNetworkLostCheck?.let { handler.removeCallbacks(it) }
+        pendingNetworkAvailableCheck = null
+        pendingNetworkLostCheck = null
 
         try {
             connectivityManager.unregisterNetworkCallback(this)
