@@ -39,10 +39,11 @@ class YggmailService : Service(), LogCallback {
         private const val NOTIFICATION_ID = 1001
 
         // WakeLock constants for battery optimization
-        // Increased timeout to 30 minutes with 25-minute renewal for better battery efficiency
-        // Yggmail's adaptive heartbeat handles connection maintenance
-        private const val WAKELOCK_TIMEOUT_MS = 30 * 60 * 1000L // 30 minutes
-        private const val WAKELOCK_RENEWAL_MS = 25 * 60 * 1000L  // Renew every 25 minutes
+        // Differentiate WakeLock usage by operation type
+        private const val WAKELOCK_SEND_TIMEOUT_MS = 60 * 1000L  // 1 minute for active sending
+        private const val WAKELOCK_IDLE_TIMEOUT_MS = 5 * 60 * 1000L  // 5 minutes for idle maintenance
+        private const val WAKELOCK_IDLE_THRESHOLD_MS = 2 * 60 * 1000L  // 2 minutes of inactivity
+        private const val WAKELOCK_GRACE_PERIOD_MS = 5 * 1000L  // 5-second grace period before release
 
         const val ACTION_START = "com.jbselfcompany.tyr.START"
         const val ACTION_STOP = "com.jbselfcompany.tyr.STOP"
@@ -107,6 +108,10 @@ class YggmailService : Service(), LogCallback {
     // WakeLock renewal
     private var wakeLockRenewalRunnable: Runnable? = null
     private var isAppActive = false // Track if app is in foreground
+
+    // Battery optimization: Track active send operations
+    private var activeSendOperations = java.util.concurrent.atomic.AtomicInteger(0)
+    private var lastSendActivity = System.currentTimeMillis()
 
     // Mail activity monitoring for adaptive heartbeat
     // No periodic polling needed - yggmail library handles adaptive heartbeat internally
@@ -263,8 +268,7 @@ class YggmailService : Service(), LogCallback {
             yggmailService?.start(peers)
             Log.i(TAG, "Yggmail service started successfully")
 
-            // Acquire wake lock with timeout and start periodic renewal
-            acquireWakeLockWithTimeout()
+            // Start adaptive WakeLock renewal
             scheduleWakeLockRenewal()
 
             isRunning = true
@@ -341,23 +345,6 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
-     * Acquire WakeLock with timeout for battery optimization
-     */
-    private fun acquireWakeLockWithTimeout() {
-        try {
-            wakeLock?.let { lock ->
-                if (lock.isHeld) {
-                    lock.release()
-                }
-                lock.acquire(WAKELOCK_TIMEOUT_MS)
-                Log.d(TAG, "WakeLock acquired with ${WAKELOCK_TIMEOUT_MS / 1000}s timeout")
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error acquiring WakeLock", e)
-        }
-    }
-
-    /**
      * Release WakeLock safely
      */
     private fun releaseWakeLock() {
@@ -374,19 +361,94 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
-     * Schedule periodic WakeLock renewal to maintain service while optimizing battery
+     * Schedule adaptive WakeLock renewal based on activity level
+     * Battery optimization: Only hold WakeLock when actively needed
      */
     private fun scheduleWakeLockRenewal() {
         wakeLockRenewalRunnable = Runnable {
-            if (isRunning) {
-                Log.d(TAG, "Renewing WakeLock")
-                acquireWakeLockWithTimeout()
-                scheduleWakeLockRenewal() // Schedule next renewal
+            if (!isRunning) {
+                return@Runnable
+            }
+
+            val timeSinceLastSend = System.currentTimeMillis() - lastSendActivity
+            val activeOps = activeSendOperations.get()
+
+            when {
+                // Active sending - keep aggressive WakeLock
+                activeOps > 0 -> {
+                    acquireWakeLockWithTimeout(WAKELOCK_SEND_TIMEOUT_MS)
+                    Log.d(TAG, "[Battery Optimization] Active sends: $activeOps - aggressive WakeLock")
+                    serviceHandler.postDelayed(wakeLockRenewalRunnable!!, WAKELOCK_SEND_TIMEOUT_MS / 2)
+                }
+
+                // Recent activity (< 2 minutes) - moderate WakeLock
+                timeSinceLastSend < WAKELOCK_IDLE_THRESHOLD_MS -> {
+                    acquireWakeLockWithTimeout(WAKELOCK_IDLE_TIMEOUT_MS)
+                    Log.d(TAG, "[Battery Optimization] Recent activity - moderate WakeLock")
+                    serviceHandler.postDelayed(wakeLockRenewalRunnable!!, WAKELOCK_IDLE_TIMEOUT_MS / 2)
+                }
+
+                // Idle - release WakeLock, rely on network events
+                else -> {
+                    releaseWakeLock()
+                    Log.d(TAG, "[Battery Optimization] Service idle - WakeLock released to save battery")
+                    // Schedule next check in 1 minute
+                    serviceHandler.postDelayed(wakeLockRenewalRunnable!!, 60 * 1000L)
+                }
             }
         }
 
         wakeLockRenewalRunnable?.let {
-            serviceHandler.postDelayed(it, WAKELOCK_RENEWAL_MS)
+            serviceHandler.postDelayed(it, WAKELOCK_SEND_TIMEOUT_MS)
+        }
+    }
+
+    /**
+     * Acquire WakeLock with specified timeout
+     */
+    private fun acquireWakeLockWithTimeout(timeoutMs: Long) {
+        try {
+            wakeLock?.let { lock ->
+                if (lock.isHeld) {
+                    lock.release()
+                }
+                lock.acquire(timeoutMs)
+                Log.d(TAG, "WakeLock acquired with ${timeoutMs / 1000}s timeout")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error acquiring WakeLock", e)
+        }
+    }
+
+    /**
+     * Notify that a message send operation started
+     * Acquires WakeLock for active sending
+     */
+    fun notifyMessageSendStarted() {
+        activeSendOperations.incrementAndGet()
+        lastSendActivity = System.currentTimeMillis()
+
+        serviceHandler.post {
+            acquireWakeLockWithTimeout(WAKELOCK_SEND_TIMEOUT_MS)
+            Log.d(TAG, "[Battery Optimization] Send started - WakeLock acquired")
+        }
+    }
+
+    /**
+     * Notify that a message send operation completed
+     * Releases WakeLock after grace period if no more sends active
+     */
+    fun notifyMessageSendCompleted() {
+        val remaining = activeSendOperations.decrementAndGet()
+
+        if (remaining <= 0) {
+            // No active send operations - release WakeLock after grace period
+            serviceHandler.postDelayed({
+                if (activeSendOperations.get() == 0) {
+                    releaseWakeLock()
+                    Log.d(TAG, "[Battery Optimization] All sends completed - WakeLock released")
+                }
+            }, WAKELOCK_GRACE_PERIOD_MS)
         }
     }
 
@@ -631,7 +693,7 @@ class YggmailService : Service(), LogCallback {
     /**
      * Notify service that app is in foreground (active)
      * This enables more aggressive heartbeat for better responsiveness
-     * When app is active, we acquire WakeLock more aggressively
+     * Battery optimization: Update activity timestamp
      */
     fun setAppActive(active: Boolean) {
         try {
@@ -639,10 +701,11 @@ class YggmailService : Service(), LogCallback {
             yggmailService?.setActive(active)
             Log.d(TAG, "App activity state set to: $active")
 
-            // When app becomes active, immediately acquire WakeLock for better responsiveness
+            // Update activity timestamp to prevent WakeLock release
             if (active && isRunning) {
+                lastSendActivity = System.currentTimeMillis()
                 serviceHandler.post {
-                    acquireWakeLockWithTimeout()
+                    acquireWakeLockWithTimeout(WAKELOCK_IDLE_TIMEOUT_MS)
                 }
             }
         } catch (e: Exception) {
@@ -653,9 +716,11 @@ class YggmailService : Service(), LogCallback {
     /**
      * Notify service about mail activity (sending/receiving)
      * This triggers aggressive mode for immediate delivery
+     * Battery optimization: Update activity timestamp
      */
     fun notifyMailActivity() {
         try {
+            lastSendActivity = System.currentTimeMillis()
             yggmailService?.recordMailActivity()
             Log.d(TAG, "Mail activity recorded")
         } catch (e: Exception) {
