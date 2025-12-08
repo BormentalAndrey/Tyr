@@ -1,0 +1,2 @@
+• Optimized message delivery time to maintain communication (yggmail library)
+• Resets the number of sends when the network type changes (yggmail library)
