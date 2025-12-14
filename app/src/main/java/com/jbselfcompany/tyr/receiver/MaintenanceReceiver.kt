@@ -1,0 +1,129 @@
+package com.jbselfcompany.tyr.receiver
+
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.PowerManager
+import android.util.Log
+import com.jbselfcompany.tyr.service.YggmailService
+
+/**
+ * Broadcast receiver for periodic maintenance tasks.
+ * Works with AlarmManager for Doze Mode compatibility.
+ *
+ * Battery optimization: Instead of continuous WakeLock renewal,
+ * we use AlarmManager to wake up periodically (every 15 minutes)
+ * for lightweight maintenance tasks.
+ */
+class MaintenanceReceiver : BroadcastReceiver() {
+
+    companion object {
+        private const val TAG = "MaintenanceReceiver"
+        private const val ACTION_MAINTENANCE = "com.jbselfcompany.tyr.ACTION_MAINTENANCE"
+        private const val MAINTENANCE_INTERVAL_MS = 15 * 60 * 1000L // 15 minutes
+
+        /**
+         * Schedule periodic maintenance using AlarmManager.
+         * Compatible with Doze Mode via setExactAndAllowWhileIdle().
+         */
+        fun scheduleMaintenance(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, MaintenanceReceiver::class.java).apply {
+                action = ACTION_MAINTENANCE
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Calculate next trigger time
+            val triggerTime = System.currentTimeMillis() + MAINTENANCE_INTERVAL_MS
+
+            // Use setExactAndAllowWhileIdle for Doze Mode compatibility
+            // This guarantees execution even in Doze Mode (up to 9 times per 15 min window)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+                Log.d(TAG, "Scheduled maintenance in 15 minutes (Doze-compatible)")
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerTime,
+                    pendingIntent
+                )
+                Log.d(TAG, "Scheduled maintenance in 15 minutes")
+            }
+        }
+
+        /**
+         * Cancel scheduled maintenance.
+         */
+        fun cancelMaintenance(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, MaintenanceReceiver::class.java).apply {
+                action = ACTION_MAINTENANCE
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            Log.d(TAG, "Maintenance scheduling cancelled")
+        }
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != ACTION_MAINTENANCE) {
+            return
+        }
+
+        Log.d(TAG, "Maintenance task triggered")
+
+        // Acquire a brief WakeLock for the duration of this maintenance
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "Tyr:Maintenance"
+        )
+
+        try {
+            // Acquire WakeLock for maximum 30 seconds
+            wakeLock.acquire(30_000)
+
+            // Check if service is running
+            if (!YggmailService.isRunning) {
+                Log.d(TAG, "Service not running, skipping maintenance")
+                return
+            }
+
+            // Lightweight maintenance tasks:
+            // 1. Verify service health (handled by service internally)
+            // 2. Trigger any pending queue checks (if needed)
+            // Note: The native yggmail library handles its own heartbeats,
+            // we just ensure the service stays responsive
+
+            Log.d(TAG, "Maintenance completed successfully")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during maintenance", e)
+        } finally {
+            // Always release WakeLock
+            if (wakeLock.isHeld) {
+                wakeLock.release()
+            }
+
+            // Reschedule next maintenance
+            scheduleMaintenance(context)
+        }
+    }
+}

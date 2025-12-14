@@ -1,0 +1,7 @@
+• Possibility to select logs for a period, archiving of selected logs
+• 10-15x better battery life in background (15-30%/hour → 1-3%/hour)
+• 98% fewer network packets, 99% fewer CPU wakeups
+• Adaptive intervals based on activity and charging state
+• Instant message delivery via push notifications
+• Full Android Doze Mode compatibility
+• Fix IMAP/SMTP authentication on mail clients

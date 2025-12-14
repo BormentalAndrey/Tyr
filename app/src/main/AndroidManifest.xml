@@ -118,6 +118,23 @@
             </intent-filter>
         </receiver>
 
+        <!-- Maintenance Receiver for periodic tasks -->
+        <receiver
+            android:name=".receiver.MaintenanceReceiver"
+            android:exported="false"
+            android:enabled="true" />
+
+        <!-- FileProvider for sharing log archives -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.jbselfcompany.tyr.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 
 </manifest>

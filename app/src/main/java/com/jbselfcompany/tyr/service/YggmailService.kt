@@ -4,12 +4,16 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.Binder
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
@@ -20,6 +24,7 @@ import androidx.core.app.NotificationCompat
 import com.jbselfcompany.tyr.R
 import com.jbselfcompany.tyr.TyrApplication
 import com.jbselfcompany.tyr.data.PeerInfo
+import com.jbselfcompany.tyr.receiver.MaintenanceReceiver
 import com.jbselfcompany.tyr.ui.MainActivity
 import mobile.LogCallback
 import mobile.YggmailService as MobileYggmailService
@@ -49,6 +54,7 @@ class YggmailService : Service(), LogCallback {
 
         const val ACTION_START = "com.jbselfcompany.tyr.START"
         const val ACTION_STOP = "com.jbselfcompany.tyr.STOP"
+        const val ACTION_SOFT_STOP = "com.jbselfcompany.tyr.SOFT_STOP"
 
         /**
          * Check if service is currently running
@@ -72,6 +78,16 @@ class YggmailService : Service(), LogCallback {
         fun stop(context: Context) {
             val intent = Intent(context, YggmailService::class.java).apply {
                 action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+
+        /**
+         * Soft stop the Yggmail service (gracefully disconnect peers first)
+         */
+        fun softStop(context: Context) {
+            val intent = Intent(context, YggmailService::class.java).apply {
+                action = ACTION_SOFT_STOP
             }
             context.startService(intent)
         }
@@ -107,13 +123,53 @@ class YggmailService : Service(), LogCallback {
     private var lastError: String? = null
     private val statusListeners = mutableListOf<ServiceStatusListener>()
 
-    // WakeLock renewal
-    private var wakeLockRenewalRunnable: Runnable? = null
+    // Battery optimization state
     private var isAppActive = false // Track if app is in foreground
+    private var isCharging = false // Track if device is charging
+    private var isDozing = false // Track if device is in Doze Mode
 
     // Battery optimization: Track active send operations
     private var activeSendOperations = java.util.concurrent.atomic.AtomicInteger(0)
     private var lastSendActivity = System.currentTimeMillis()
+
+    // Doze Mode and Battery receivers
+    private val dozeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED -> {
+                    val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    val wasDozing = isDozing
+                    isDozing = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        powerManager.isDeviceIdleMode
+                    } else {
+                        false
+                    }
+
+                    if (wasDozing != isDozing) {
+                        Log.d(TAG, "[Battery] Doze mode changed: $isDozing")
+                        updateNativeServicePowerState()
+                    }
+                }
+            }
+        }
+    }
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_POWER_CONNECTED -> {
+                    isCharging = true
+                    Log.d(TAG, "[Battery] Device charging started")
+                    updateNativeServicePowerState()
+                }
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    isCharging = false
+                    Log.d(TAG, "[Battery] Device on battery")
+                    updateNativeServicePowerState()
+                }
+            }
+        }
+    }
 
     // Mail activity monitoring for adaptive heartbeat
     // No periodic polling needed - yggmail library handles adaptive heartbeat internally
@@ -136,13 +192,37 @@ class YggmailService : Service(), LogCallback {
         serviceThread = HandlerThread("YggmailServiceThread").apply { start() }
         serviceHandler = Handler(serviceThread.looper)
 
-        // Acquire wake lock
+        // Acquire wake lock (will be used only for critical operations, not continuously)
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "Tyr::YggmailService"
         ).apply {
             setReferenceCounted(false)
+        }
+
+        // Register Doze Mode receiver for battery optimization
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val dozeFilter = IntentFilter(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
+            registerReceiver(dozeReceiver, dozeFilter)
+            Log.d(TAG, "[Battery] Doze Mode receiver registered")
+        }
+
+        // Register battery charging receiver
+        val batteryFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+        registerReceiver(batteryReceiver, batteryFilter)
+        Log.d(TAG, "[Battery] Battery receiver registered")
+
+        // Check initial charging state
+        val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        batteryIntent?.let {
+            val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL
+            Log.d(TAG, "[Battery] Initial charging state: $isCharging")
         }
     }
 
@@ -169,6 +249,16 @@ class YggmailService : Service(), LogCallback {
                     }
                 }
             }
+            ACTION_SOFT_STOP -> {
+                // Soft stop - gracefully disconnect peers first, then stop
+                serviceHandler.post {
+                    performSoftStopSync()
+                    // Call stopSelf on main thread after cleanup completes
+                    mainHandler.post {
+                        stopSelf()
+                    }
+                }
+            }
             else -> {
                 // Service restarted by system
                 if (!isRunning) {
@@ -188,8 +278,25 @@ class YggmailService : Service(), LogCallback {
     override fun onDestroy() {
         Log.d(TAG, "Service onDestroy")
 
-        // Cancel WakeLock renewal
-        wakeLockRenewalRunnable?.let { serviceHandler.removeCallbacks(it) }
+        // Cancel maintenance scheduling
+        MaintenanceReceiver.cancelMaintenance(this)
+
+        // Unregister receivers
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                unregisterReceiver(dozeReceiver)
+                Log.d(TAG, "[Battery] Doze Mode receiver unregistered")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering doze receiver", e)
+        }
+
+        try {
+            unregisterReceiver(batteryReceiver)
+            Log.d(TAG, "[Battery] Battery receiver unregistered")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering battery receiver", e)
+        }
 
         // Only stop if not already stopped (prevent duplicate stop calls)
         if (isRunning) {
@@ -302,8 +409,12 @@ class YggmailService : Service(), LogCallback {
             yggmailService?.start(peers)
             Log.i(TAG, "Yggmail service started successfully")
 
-            // Start adaptive WakeLock renewal
-            scheduleWakeLockRenewal()
+            // Schedule periodic maintenance using AlarmManager (Doze-compatible)
+            MaintenanceReceiver.scheduleMaintenance(this@YggmailService)
+            Log.d(TAG, "[Battery] Maintenance scheduling started")
+
+            // Update native service with current power state
+            updateNativeServicePowerState()
 
             isRunning = true
             updateStatus(ServiceStatus.RUNNING)
@@ -354,12 +465,9 @@ class YggmailService : Service(), LogCallback {
         var closeError: Throwable? = null
 
         try {
-            // Cancel WakeLock renewal first (before any blocking operations)
-            wakeLockRenewalRunnable?.let { serviceHandler.removeCallbacks(it) }
-
             // Acquire WakeLock for shutdown process to prevent interruption
             // This is critical to ensure complete cleanup
-            acquireWakeLockWithTimeout(15000) // 15 second timeout for shutdown
+            acquireWakeLockForOperation("shutdown", 15_000)
 
             // Step 1: Stop the service (closes network connections)
             // Wrap in try-catch for ALL throwables (including native crashes/panics)
@@ -523,63 +631,44 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
-     * Schedule adaptive WakeLock renewal based on activity level
-     * Battery optimization: Only hold WakeLock when actively needed
+     * Update native service with current power state for adaptive battery optimization.
+     * This informs the yggmail library about device state so it can adjust:
+     * - QUIC keep-alive intervals (60s on battery, 15s when charging, 5s when active)
+     * - IMAP heartbeat intervals (3-29min on battery, more frequent when charging)
      */
-    private fun scheduleWakeLockRenewal() {
-        wakeLockRenewalRunnable = Runnable {
-            if (!isRunning) {
-                return@Runnable
+    private fun updateNativeServicePowerState() {
+        serviceHandler.post {
+            try {
+                yggmailService?.let { service ->
+                    // Update active state (foreground vs background)
+                    service.setActive(isAppActive && !isDozing)
+
+                    // Update charging state
+                    service.setCharging(isCharging)
+
+                    Log.d(TAG, "[Battery] Power state updated - Active: ${isAppActive && !isDozing}, Charging: $isCharging, Dozing: $isDozing")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating power state", e)
             }
-
-            val timeSinceLastSend = System.currentTimeMillis() - lastSendActivity
-            val activeOps = activeSendOperations.get()
-
-            when {
-                // Active sending - keep aggressive WakeLock
-                activeOps > 0 -> {
-                    acquireWakeLockWithTimeout(WAKELOCK_SEND_TIMEOUT_MS)
-                    Log.d(TAG, "[Battery Optimization] Active sends: $activeOps - aggressive WakeLock")
-                    serviceHandler.postDelayed(wakeLockRenewalRunnable!!, WAKELOCK_SEND_TIMEOUT_MS / 2)
-                }
-
-                // Recent activity (< 2 minutes) - moderate WakeLock
-                timeSinceLastSend < WAKELOCK_IDLE_THRESHOLD_MS -> {
-                    acquireWakeLockWithTimeout(WAKELOCK_IDLE_TIMEOUT_MS)
-                    Log.d(TAG, "[Battery Optimization] Recent activity - moderate WakeLock")
-                    serviceHandler.postDelayed(wakeLockRenewalRunnable!!, WAKELOCK_IDLE_TIMEOUT_MS / 2)
-                }
-
-                // Idle - release WakeLock, stop scheduling until activity resumes
-                else -> {
-                    releaseWakeLock()
-                    Log.d(TAG, "[Battery Optimization] Service idle - WakeLock released, scheduling stopped")
-                    // DO NOT schedule next check - let network events wake us up
-                    // The service will be reactivated by:
-                    // 1. setAppActive(true) when app comes to foreground
-                    // 2. notifyMessageSendStarted() when mail activity occurs
-                    // 3. Network events from Yggdrasil library
-                    return@Runnable // Stop the renewal loop
-                }
-            }
-        }
-
-        wakeLockRenewalRunnable?.let {
-            serviceHandler.postDelayed(it, WAKELOCK_SEND_TIMEOUT_MS)
         }
     }
 
     /**
-     * Acquire WakeLock with specified timeout
+     * Acquire WakeLock for a critical operation only.
+     * Battery optimization: WakeLock is NOT held continuously, only for specific operations.
+     *
+     * @param operation Name of the operation for logging
+     * @param durationMs Maximum duration to hold the lock (default 30 seconds)
      */
-    private fun acquireWakeLockWithTimeout(timeoutMs: Long) {
+    private fun acquireWakeLockForOperation(operation: String, durationMs: Long = 30_000) {
         try {
             wakeLock?.let { lock ->
                 if (lock.isHeld) {
                     lock.release()
                 }
-                lock.acquire(timeoutMs)
-                Log.d(TAG, "WakeLock acquired with ${timeoutMs / 1000}s timeout")
+                lock.acquire(durationMs)
+                Log.d(TAG, "[Battery] WakeLock acquired for $operation (${durationMs}ms)")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error acquiring WakeLock", e)
@@ -587,40 +676,26 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
-     * Notify that a message send operation started
-     * Acquires WakeLock for active sending
+     * Notify that a message send operation started.
+     * Acquires brief WakeLock for the operation.
+     * Battery optimization: WakeLock only for 30 seconds, not continuously.
      */
     fun notifyMessageSendStarted() {
         activeSendOperations.incrementAndGet()
         lastSendActivity = System.currentTimeMillis()
 
         serviceHandler.post {
-            acquireWakeLockWithTimeout(WAKELOCK_SEND_TIMEOUT_MS)
-            // Restart renewal cycle if it was stopped
-            wakeLockRenewalRunnable?.let {
-                serviceHandler.removeCallbacks(it)
-                serviceHandler.postDelayed(it, WAKELOCK_SEND_TIMEOUT_MS / 2)
-            }
-            Log.d(TAG, "[Battery Optimization] Send started - WakeLock acquired, renewal restarted")
+            acquireWakeLockForOperation("message_send", 30_000)
         }
     }
 
     /**
-     * Notify that a message send operation completed
-     * Releases WakeLock after grace period if no more sends active
+     * Notify that a message send operation completed.
+     * WakeLock will automatically release after timeout.
      */
     fun notifyMessageSendCompleted() {
-        val remaining = activeSendOperations.decrementAndGet()
-
-        if (remaining <= 0) {
-            // No active send operations - release WakeLock after grace period
-            serviceHandler.postDelayed({
-                if (activeSendOperations.get() == 0) {
-                    releaseWakeLock()
-                    Log.d(TAG, "[Battery Optimization] All sends completed - WakeLock released")
-                }
-            }, WAKELOCK_GRACE_PERIOD_MS)
-        }
+        activeSendOperations.decrementAndGet()
+        Log.d(TAG, "[Battery] Message send completed, active operations: ${activeSendOperations.get()}")
     }
 
     /**
@@ -862,28 +937,18 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
-     * Notify service that app is in foreground (active)
-     * This enables more aggressive heartbeat for better responsiveness
-     * Battery optimization: Update activity timestamp
+     * Notify service that app is in foreground (active).
+     * This triggers more responsive network intervals in the native library.
+     * Battery optimization: Updates native library power state for adaptive behavior.
      */
     fun setAppActive(active: Boolean) {
         try {
             isAppActive = active
-            yggmailService?.setActive(active)
-            Log.d(TAG, "App activity state set to: $active")
+            Log.d(TAG, "[Battery] App activity state changed to: $active")
 
-            // Update activity timestamp to prevent WakeLock release
-            if (active && isRunning) {
-                lastSendActivity = System.currentTimeMillis()
-                serviceHandler.post {
-                    acquireWakeLockWithTimeout(WAKELOCK_IDLE_TIMEOUT_MS)
-                    // Restart renewal cycle if it was stopped
-                    wakeLockRenewalRunnable?.let {
-                        serviceHandler.removeCallbacks(it)
-                        serviceHandler.postDelayed(it, WAKELOCK_IDLE_TIMEOUT_MS / 2)
-                    }
-                }
-            }
+            // Update native service with new power state
+            updateNativeServicePowerState()
+
         } catch (e: Exception) {
             Log.e(TAG, "Error setting app activity state", e)
         }
@@ -929,6 +994,32 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
+     * Synchronous soft stop (must be called from service handler thread)
+     */
+    private fun performSoftStopSync() {
+        try {
+            Log.i(TAG, "Performing soft stop...")
+            updateStatus(ServiceStatus.STOPPING)
+
+            // First, gracefully disconnect all peers by updating to empty peer list
+            // This uses Yggdrasil Core's RemovePeer for clean disconnection
+            yggmailService?.updatePeers("")
+            Log.i(TAG, "All peers disconnected gracefully")
+
+            // Give a short delay for graceful disconnection to complete
+            Thread.sleep(500)
+
+            // Now perform normal stop
+            stopYggmailSync()
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during soft stop, falling back to normal stop", e)
+            // Fallback to normal stop if soft stop fails
+            stopYggmailSync()
+        }
+    }
+
+    /**
      * Soft stop: Gracefully disconnect peers before stopping the service
      * This method disconnects all peers cleanly to avoid ErrClosed errors in logs
      *
@@ -940,26 +1031,7 @@ class YggmailService : Service(), LogCallback {
      */
     fun softStop() {
         serviceHandler.post {
-            try {
-                Log.i(TAG, "Performing soft stop...")
-                updateStatus(ServiceStatus.STOPPING)
-
-                // First, gracefully disconnect all peers by updating to empty peer list
-                // This uses Yggdrasil Core's RemovePeer for clean disconnection
-                yggmailService?.updatePeers("")
-                Log.i(TAG, "All peers disconnected gracefully")
-
-                // Give a short delay for graceful disconnection to complete
-                Thread.sleep(500)
-
-                // Now perform normal stop
-                stopYggmailSync()
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during soft stop, falling back to normal stop", e)
-                // Fallback to normal stop if soft stop fails
-                stopYggmailSync()
-            }
+            performSoftStopSync()
         }
     }
 }

@@ -286,8 +286,8 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
         // Show loading overlay
         showLoadingOverlay(true, getString(R.string.restarting_service))
 
-        // Stop service
-        YggmailService.stop(this)
+        // Soft stop service (gracefully disconnect peers first)
+        YggmailService.softStop(this)
 
         // Wait for service to stop, then restart (6 seconds delay)
         Handler(Looper.getMainLooper()).postDelayed({

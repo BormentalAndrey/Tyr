@@ -183,7 +183,8 @@
     <!-- Logs -->
     <string name="logs">Logs</string>
     <string name="view_logs">View Logs</string>
-    <string name="share_logs">Share Logs</string>
+    <string name="share_logs">Share</string>
+    <string name="export_logs">Export Logs</string>
     <string name="clear_logs">Clear Logs</string>
     <string name="clear_logs_description">Clear accumulated logs and start fresh</string>
     <string name="tyr_logs">Tyr Logs</string>
@@ -198,6 +199,14 @@
     <string name="error_loading_logs">Error loading logs: %s</string>
     <string name="error_clearing_logs">Failed to clear logs</string>
     <string name="log_collection_disabled">Log collection is disabled.\n\nTo view logs, enable log collection in:\nSettings → Debug Settings → Enable Log Collection</string>
+    <string name="select_log_interval">Select log interval</string>
+    <string name="interval_10_minutes">10 minutes</string>
+    <string name="interval_30_minutes">30 minutes</string>
+    <string name="interval_60_minutes">60 minutes</string>
+    <string name="interval_24_hours">24 hours</string>
+    <string name="exporting_logs">Exporting logs…</string>
+    <string name="logs_exported">Logs exported successfully</string>
+    <string name="error_exporting_logs">Error exporting logs: %s</string>
 
     <!-- Backup & Restore -->
     <string name="backup_password">Backup Password</string>
