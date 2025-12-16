@@ -36,4 +36,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
+
+    <!-- AlertDialog with centered buttons -->
+    <style name="Theme.Tyr.AlertDialog.CenteredButtons" parent="ThemeOverlay.Material3.MaterialAlertDialog.Centered">
+        <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.Material3.Title.Text.CenterStacked</item>
+    </style>
 </resources>

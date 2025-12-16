@@ -464,8 +464,13 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      * Latency information comes directly from Yggdrasil transport layer
      */
     private fun startNetworkMonitoring() {
+        Log.d("MainActivity", "Starting network monitoring")
         networkStatsMonitor.start(object : NetworkStatsMonitor.NetworkStatsListener {
             override fun onStatsUpdated(stats: NetworkStatsMonitor.NetworkStats) {
+                Log.d("MainActivity", "onStatsUpdated called with ${stats.peers.size} peers")
+                stats.peers.forEach { peer ->
+                    Log.d("MainActivity", "  Peer: ${peer.host}:${peer.port}, connected=${peer.connected}, latencyMs=${peer.latencyMs}")
+                }
                 updateNetworkStatsUI(stats)
             }
         }, enableLatencyMeasurement = true) // Parameter kept for API compatibility
@@ -482,6 +487,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      * Update UI with network statistics
      */
     private fun updateNetworkStatsUI(stats: NetworkStatsMonitor.NetworkStats) {
+        Log.d("MainActivity", "updateNetworkStatsUI called, updating UI")
         // Connection type
         binding.textConnectionType.text = stats.connectionType
 
@@ -493,6 +499,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      * Update the list of peers with latency information
      */
     private fun updatePeersList(peers: List<NetworkStatsMonitor.PeerInfo>) {
+        Log.d("MainActivity", "updatePeersList called with ${peers.size} peers")
         // Clear existing views
         binding.peersContainer.removeAllViews()
 

@@ -30,36 +30,63 @@ class MaintenanceReceiver : BroadcastReceiver() {
          * Compatible with Doze Mode via setExactAndAllowWhileIdle().
          */
         fun scheduleMaintenance(context: Context) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(context, MaintenanceReceiver::class.java).apply {
-                action = ACTION_MAINTENANCE
-            }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            // Calculate next trigger time
-            val triggerTime = System.currentTimeMillis() + MAINTENANCE_INTERVAL_MS
-
-            // Use setExactAndAllowWhileIdle for Doze Mode compatibility
-            // This guarantees execution even in Doze Mode (up to 9 times per 15 min window)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
+            try {
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(context, MaintenanceReceiver::class.java).apply {
+                    action = ACTION_MAINTENANCE
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
-                Log.d(TAG, "Scheduled maintenance in 15 minutes (Doze-compatible)")
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTime,
-                    pendingIntent
-                )
-                Log.d(TAG, "Scheduled maintenance in 15 minutes")
+
+                // Calculate next trigger time
+                val triggerTime = System.currentTimeMillis() + MAINTENANCE_INTERVAL_MS
+
+                // Check if we can schedule exact alarms (Android 12+)
+                val canScheduleExactAlarms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    alarmManager.canScheduleExactAlarms()
+                } else {
+                    true
+                }
+
+                if (!canScheduleExactAlarms) {
+                    Log.w(TAG, "Cannot schedule exact alarms - permission not granted. Using inexact alarm.")
+                    // Fallback to inexact alarm (will work but less precise)
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Scheduled maintenance in ~15 minutes (inexact)")
+                    return
+                }
+
+                // Use setExactAndAllowWhileIdle for Doze Mode compatibility
+                // This guarantees execution even in Doze Mode (up to 9 times per 15 min window)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Scheduled maintenance in 15 minutes (Doze-compatible)")
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTime,
+                        pendingIntent
+                    )
+                    Log.d(TAG, "Scheduled maintenance in 15 minutes")
+                }
+            } catch (e: SecurityException) {
+                // Android 12+ may throw SecurityException if SCHEDULE_EXACT_ALARM not granted
+                Log.e(TAG, "SecurityException scheduling maintenance - exact alarm permission not granted", e)
+                // Service will continue to work, just without precise maintenance scheduling
+            } catch (e: Exception) {
+                Log.e(TAG, "Error scheduling maintenance", e)
             }
         }
 
@@ -67,18 +94,22 @@ class MaintenanceReceiver : BroadcastReceiver() {
          * Cancel scheduled maintenance.
          */
         fun cancelMaintenance(context: Context) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(context, MaintenanceReceiver::class.java).apply {
-                action = ACTION_MAINTENANCE
+            try {
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(context, MaintenanceReceiver::class.java).apply {
+                    action = ACTION_MAINTENANCE
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                alarmManager.cancel(pendingIntent)
+                Log.d(TAG, "Maintenance scheduling cancelled")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cancelling maintenance", e)
             }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            alarmManager.cancel(pendingIntent)
-            Log.d(TAG, "Maintenance scheduling cancelled")
         }
     }
 

@@ -65,7 +65,10 @@ class NetworkStatsMonitor(private val context: Context) {
      */
     fun start(listener: NetworkStatsListener, enableLatencyMeasurement: Boolean = true) {
         if (isMonitoring) {
-            Log.w(TAG, "Already monitoring")
+            // Already monitoring - just update the listener
+            Log.d(TAG, "Already monitoring, updating listener")
+            this.listener = listener
+            this.measureLatency = enableLatencyMeasurement
             return
         }
 
@@ -142,6 +145,10 @@ class NetworkStatsMonitor(private val context: Context) {
 
             // Notify listener on main thread
             handler.post {
+                Log.d(TAG, "Calling listener with ${peers.size} peers (listener is ${if (listener != null) "not null" else "null"})")
+                peers.forEach { peer ->
+                    Log.d(TAG, "  Peer data: ${peer.host}:${peer.port}, connected=${peer.connected}, latencyMs=${peer.latencyMs}")
+                }
                 listener?.onStatsUpdated(stats)
             }
 

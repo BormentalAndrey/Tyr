@@ -65,14 +65,6 @@
             android:textSize="16sp"
             app:cornerRadius="16dp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/button_skip"
-            style="@style/Widget.Material3.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:text="@string/skip" />
-
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

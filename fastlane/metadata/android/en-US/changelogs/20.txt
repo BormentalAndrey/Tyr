@@ -1,0 +1,1 @@
+• Added the option of auto-configuration of peers, sorting by RTT

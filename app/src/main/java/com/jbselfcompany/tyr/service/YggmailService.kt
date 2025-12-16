@@ -69,7 +69,14 @@ class YggmailService : Service(), LogCallback {
             val intent = Intent(context, YggmailService::class.java).apply {
                 action = ACTION_START
             }
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: Exception) {
+                // Android 12+ may throw ForegroundServiceStartNotAllowedException
+                // if app is in background or doesn't meet other foreground service requirements
+                Log.e(TAG, "Failed to start foreground service", e)
+                // Service will not start, but we don't crash the app
+            }
         }
 
         /**
@@ -122,6 +129,10 @@ class YggmailService : Service(), LogCallback {
     private var serviceStatus = ServiceStatus.STOPPED
     private var lastError: String? = null
     private val statusListeners = mutableListOf<ServiceStatusListener>()
+
+    // Connection status tracking
+    private var lastConnectionStatus: String? = null
+    private var connectionCheckRunnable: Runnable? = null
 
     // Battery optimization state
     private var isAppActive = false // Track if app is in foreground
@@ -345,8 +356,18 @@ class YggmailService : Service(), LogCallback {
      * Start foreground service with notification
      */
     private fun startForegroundWithNotification() {
-        val notification = createNotification(ServiceStatus.STARTING)
-        startForeground(NOTIFICATION_ID, notification)
+        try {
+            val notification = createNotification(ServiceStatus.STARTING)
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            // Handle potential exceptions from startForeground()
+            // (e.g., on Android 12+ if foreground service type restrictions are violated)
+            Log.e(TAG, "Failed to start foreground with notification", e)
+            // Update status to ERROR and stop service
+            lastError = "Failed to start foreground service: ${e.message}"
+            updateStatus(ServiceStatus.ERROR)
+            stopSelf()
+        }
     }
 
     /**
@@ -419,6 +440,9 @@ class YggmailService : Service(), LogCallback {
             isRunning = true
             updateStatus(ServiceStatus.RUNNING)
 
+            // Start periodic connection status check for notification updates
+            startConnectionStatusCheck()
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start Yggmail service", e)
             lastError = e.message
@@ -446,6 +470,9 @@ class YggmailService : Service(), LogCallback {
      * Includes comprehensive panic/crash recovery for native library issues
      */
     private fun stopYggmailSync() {
+        // Stop periodic connection status check
+        stopConnectionStatusCheck()
+
         // Prevent concurrent stop operations
         synchronized(this) {
             if (!isRunning) {
@@ -715,8 +742,76 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
+     * Get connection status based on peer connections
+     */
+    private fun getConnectionStatus(): String {
+        return when (serviceStatus) {
+            ServiceStatus.STARTING -> getString(R.string.connection_connecting)
+            ServiceStatus.STOPPING -> getString(R.string.service_stopping)
+            ServiceStatus.STOPPED -> getString(R.string.connection_offline)
+            ServiceStatus.ERROR -> lastError ?: getString(R.string.service_error)
+            ServiceStatus.RUNNING -> {
+                // Check if any peers are connected
+                val connections = getPeerConnections()
+                val hasConnectedPeer = connections?.any { it.up } == true
+                if (hasConnectedPeer) {
+                    getString(R.string.connection_online)
+                } else {
+                    getString(R.string.connection_offline)
+                }
+            }
+        }
+    }
+
+    /**
+     * Start periodic connection status check to update notification
+     * Checks every 30 seconds if connection status has changed
+     */
+    private fun startConnectionStatusCheck() {
+        stopConnectionStatusCheck() // Clear any existing checks
+
+        connectionCheckRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    val currentStatus = getConnectionStatus()
+                    if (currentStatus != lastConnectionStatus) {
+                        lastConnectionStatus = currentStatus
+                        // Update notification on main thread
+                        mainHandler.post {
+                            val notification = createNotification(serviceStatus)
+                            notificationManager.notify(NOTIFICATION_ID, notification)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error checking connection status", e)
+                }
+
+                // Schedule next check in 30 seconds
+                if (serviceStatus == ServiceStatus.RUNNING) {
+                    mainHandler.postDelayed(this, 30_000)
+                }
+            }
+        }
+
+        // Start first check after 5 seconds (give time for connections to establish)
+        mainHandler.postDelayed(connectionCheckRunnable!!, 5_000)
+    }
+
+    /**
+     * Stop periodic connection status check
+     */
+    private fun stopConnectionStatusCheck() {
+        connectionCheckRunnable?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        connectionCheckRunnable = null
+        lastConnectionStatus = null
+    }
+
+    /**
      * Create notification for current service status
      * Optimized for low battery usage with PRIORITY_MIN
+     * Shows connection status based on peer connections instead of service status
      */
     private fun createNotification(status: ServiceStatus): Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
@@ -727,13 +822,7 @@ class YggmailService : Service(), LogCallback {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val statusText = when (status) {
-            ServiceStatus.STARTING -> getString(R.string.service_starting)
-            ServiceStatus.RUNNING -> getString(R.string.service_running)
-            ServiceStatus.STOPPING -> getString(R.string.service_stopping)
-            ServiceStatus.STOPPED -> getString(R.string.service_stopped)
-            ServiceStatus.ERROR -> lastError ?: getString(R.string.service_error)
-        }
+        val statusText = getConnectionStatus()
 
         return NotificationCompat.Builder(this, TyrApplication.CHANNEL_ID_SERVICE)
             .setContentTitle(statusText)
@@ -1017,6 +1106,78 @@ class YggmailService : Service(), LogCallback {
             // Fallback to normal stop if soft stop fails
             stopYggmailSync()
         }
+    }
+
+    /**
+     * Set peer discovery batching parameters
+     * @param batchSize Number of peers to check in each batch
+     * @param concurrency Number of concurrent checks
+     * @param pauseMs Pause duration between batches in milliseconds
+     */
+    fun setPeerBatchingParams(batchSize: Int, concurrency: Int, pauseMs: Int) {
+        serviceHandler.post {
+            try {
+                yggmailService?.setPeerBatchingParams(batchSize.toLong(), concurrency.toLong(), pauseMs.toLong())
+                Log.d(TAG, "Peer batching params set: batchSize=$batchSize, concurrency=$concurrency, pauseMs=$pauseMs")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting peer batching params", e)
+            }
+        }
+    }
+
+    /**
+     * Find available peers asynchronously
+     * @param protocols Comma-separated protocol list (e.g., "tcp,tls,quic")
+     * @param region Region filter (empty for all regions)
+     * @param maxRTTMs Maximum RTT in milliseconds
+     * @param callback Callback for progress and results
+     */
+    fun findAvailablePeersAsync(
+        protocols: String,
+        region: String,
+        maxRTTMs: Int,
+        callback: mobile.PeerDiscoveryCallback
+    ) {
+        serviceHandler.post {
+            try {
+                yggmailService?.findAvailablePeersAsync(protocols, region, maxRTTMs.toLong(), callback)
+                Log.d(TAG, "Peer discovery started: protocols=$protocols, region=$region, maxRTT=${maxRTTMs}ms")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error starting peer discovery", e)
+            }
+        }
+    }
+
+    /**
+     * Get available regions for peer filtering
+     * @return JSON array of region names
+     */
+    fun getAvailableRegions(): String? {
+        val latch = CountDownLatch(1)
+        var result: String? = null
+        var error: Exception? = null
+
+        serviceHandler.post {
+            try {
+                result = yggmailService?.availableRegions
+            } catch (e: Exception) {
+                error = e
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(10, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout getting available regions")
+            return null
+        }
+
+        if (error != null) {
+            Log.e(TAG, "Error getting available regions", error)
+            return null
+        }
+
+        return result
     }
 
     /**

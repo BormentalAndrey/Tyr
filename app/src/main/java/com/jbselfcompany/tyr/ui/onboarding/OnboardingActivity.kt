@@ -84,27 +84,17 @@ class OnboardingActivity : BaseActivity(), OnRestoreCompletedListener {
                 binding.viewPager.currentItem = currentPage - 1
             }
         }
-
-        binding.buttonSkip.setOnClickListener {
-            completeOnboarding()
-        }
     }
 
     private fun updateButtons(position: Int) {
         binding.buttonBack.isEnabled = position > 0
 
         when (position) {
-            0 -> {
-                binding.buttonNext.text = getString(R.string.next)
-                binding.buttonSkip.visibility = android.view.View.VISIBLE
-            }
-            adapter.itemCount - 1 -> {
+            2 -> {
                 binding.buttonNext.text = getString(R.string.finish)
-                binding.buttonSkip.visibility = android.view.View.GONE
             }
             else -> {
                 binding.buttonNext.text = getString(R.string.next)
-                binding.buttonSkip.visibility = android.view.View.GONE
             }
         }
     }
@@ -138,6 +128,41 @@ class OnboardingActivity : BaseActivity(), OnRestoreCompletedListener {
                             Toast.makeText(this, R.string.error_save_password, Toast.LENGTH_LONG).show()
                             false
                         }
+                    }
+                }
+            }
+            is OnboardingPeersFragment -> {
+                val selectedPeers = currentFragment.getSelectedPeers()
+                val useDefault = currentFragment.isUsingDefaultPeers()
+
+                when {
+                    selectedPeers.isEmpty() && !useDefault -> {
+                        Toast.makeText(this, R.string.error_no_peers_selected, Toast.LENGTH_SHORT).show()
+                        false
+                    }
+                    else -> {
+                        if (selectedPeers.isNotEmpty()) {
+                            // User selected custom peers - save them and disable defaults
+                            // (savePeer() automatically sets useDefaultPeers to false)
+                            selectedPeers.sortedBy { it.rtt }.forEach { peer ->
+                                configRepository.savePeer(peer.toPeerInfo())
+                            }
+                        } else {
+                            // User chose to use default peers - save them as PeerInfo with DEFAULT tag
+                            // This will preserve the useDefaultPeers flag since savePeer checks the tag
+                            com.jbselfcompany.tyr.data.ConfigRepository.DEFAULT_PEERS.forEach { peerUri ->
+                                val defaultPeer = com.jbselfcompany.tyr.data.PeerInfo(
+                                    uri = peerUri,
+                                    isEnabled = true,
+                                    tag = com.jbselfcompany.tyr.data.PeerInfo.PeerTag.DEFAULT
+                                )
+                                configRepository.savePeer(defaultPeer)
+                            }
+                            // Explicitly set the flag to true after saving default peers
+                            configRepository.setUseDefaultPeers(true)
+                        }
+
+                        true
                     }
                 }
             }

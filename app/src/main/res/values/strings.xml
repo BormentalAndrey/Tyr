@@ -37,6 +37,11 @@
     <string name="service_error">Error</string>
     <string name="service_error_desc">Failed to start service</string>
 
+    <!-- Connection Status (for notification) -->
+    <string name="connection_online">Online</string>
+    <string name="connection_offline">Offline</string>
+    <string name="connection_connecting">Connecting…</string>
+
     <!-- Status Display -->
     <string name="status_starting">Starting…</string>
     <string name="status_running">Running</string>
@@ -109,6 +114,8 @@
     <string name="configure_peers_title">Configure Peers</string>
     <string name="configure_peers_description">Manage Yggdrasil network peer connections</string>
     <string name="use_default_peers">Use default peers</string>
+    <string name="use_default_peers_description">Connect using built-in peer list</string>
+    <string name="peer_onboarding_instructions">Choose how to connect to the Yggdrasil network:\n\n• Enable the switch to use default peers\n• Or tap \"Find Peers\" to discover available peers</string>
     <string name="custom_peers">Custom Peers</string>
     <string name="add_peer">Add Peer</string>
     <string name="edit_peer">Edit Peer</string>
@@ -265,4 +272,31 @@
 • Material Components (Apache 2.0)\n
 • And others…
 </string>
+
+    <!-- Peer Discovery -->
+    <string name="peer_add_manually">Add Manually</string>
+    <string name="peer_find_peers">Find Peers</string>
+    <string name="peer_discovery_searching">Searching for peers…</string>
+    <string name="peer_discovery_progress_percent">Searching: %d%%</string>
+    <string name="peer_discovery_discovered_peers">Discovered Peers</string>
+    <string name="peer_discovery_no_peers_found">No peers found</string>
+    <string name="peer_filter_all">All</string>
+    <string name="peer_select_all">Select All</string>
+    <string name="peer_deselect_all">Clear Selection</string>
+    <string name="peer_add_selected">Add Selected</string>
+    <string name="peer_discovery_progress">Checking %1$d / %2$d peers…</string>
+    <string name="peer_discovery_progress_detailed">Found %1$d of %2$d peers (total %3$d)</string>
+    <string name="peer_discovery_found">Found: %d peers</string>
+    <string name="peer_discovery_total_available">%d peers available</string>
+    <string name="peer_discovery_selected">%d selected</string>
+    <string name="peer_added">%d peer(s) added successfully</string>
+    <string name="peers_added">%d peer(s) added</string>
+    <string name="peer_discovery_error">Failed to discover peers: %s</string>
+    <string name="peer_discovery_no_network">No network connection</string>
+    <string name="peer_discovery_no_network_message">Cannot search for peers without an internet connection. Use default peers or add manually.</string>
+    <string name="peer_discovery_in_progress">Peer discovery already in progress</string>
+    <string name="peer_from_cache">From cache (24h)</string>
+    <string name="using_default_peers">Using default peers</string>
+    <string name="all_peers_already_exist">All selected peers already exist</string>
+    <string name="error_no_peers_selected">Please select at least one peer or use default peers</string>
 </resources>

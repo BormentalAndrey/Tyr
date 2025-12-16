@@ -30,6 +30,11 @@ class ConfigRepository(private val context: Context) {
         private const val KEY_LANGUAGE = "language"
         private const val KEY_THEME = "theme"
         private const val KEY_LOG_COLLECTION_ENABLED = "log_collection_enabled"
+        private const val KEY_CACHED_DISCOVERED_PEERS = "cached_discovered_peers"
+        private const val KEY_CACHE_TIMESTAMP = "cache_timestamp"
+
+        // Cache TTL for discovered peers (24 hours)
+        private const val CACHE_TTL_HOURS = 24
 
         // Default Yggdrasil peers
         val DEFAULT_PEERS = listOf(
@@ -196,29 +201,25 @@ class ConfigRepository(private val context: Context) {
 
     /**
      * Get all peers (with enabled/disabled state)
+     * Returns only custom saved peers, does NOT return defaults
      */
     fun getAllPeersInfo(): List<PeerInfo> {
         return try {
             val peersJson = prefs.getString(KEY_PEERS_V2, null)
             if (peersJson.isNullOrEmpty()) {
-                // Return default peer as enabled
-                DEFAULT_PEERS.map { PeerInfo(it, isEnabled = true, tag = PeerInfo.PeerTag.DEFAULT) }
+                // Return empty list - defaults should be handled by getEnabledPeers()
+                emptyList()
             } else {
                 val jsonArray = JSONArray(peersJson)
                 val peersList = mutableListOf<PeerInfo>()
                 for (i in 0 until jsonArray.length()) {
                     peersList.add(PeerInfo.fromJson(jsonArray.getJSONObject(i)))
                 }
-                // If empty and using defaults, return default peers
-                if (peersList.isEmpty() && isUsingDefaultPeers()) {
-                    DEFAULT_PEERS.map { PeerInfo(it, isEnabled = true, tag = PeerInfo.PeerTag.DEFAULT) }
-                } else {
-                    peersList
-                }
+                peersList
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting peers v2", e)
-            DEFAULT_PEERS.map { PeerInfo(it, isEnabled = true, tag = PeerInfo.PeerTag.DEFAULT) }
+            emptyList()
         }
     }
 
@@ -234,7 +235,11 @@ class ConfigRepository(private val context: Context) {
             peers.add(peer)
         }
         savePeersV2(peers)
-        setUseDefaultPeers(false)
+
+        // Only disable default peers if saving a custom peer
+        if (peer.tag != PeerInfo.PeerTag.DEFAULT) {
+            setUseDefaultPeers(false)
+        }
     }
 
     /**
@@ -279,18 +284,26 @@ class ConfigRepository(private val context: Context) {
 
     /**
      * Get only enabled peers as strings
+     * Prioritizes custom peers over defaults
      */
     fun getEnabledPeers(): List<String> {
+        // First, get all custom saved peers
+        val customPeers = getAllPeersInfo()
+            .filter { it.isEnabled }
+            .map { it.uri }
+
+        // If there are any enabled custom peers, use ONLY them (ignore defaults)
+        if (customPeers.isNotEmpty()) {
+            return customPeers
+        }
+
+        // No custom peers - check if we should use defaults
         return if (isUsingDefaultPeers()) {
             DEFAULT_PEERS
         } else {
-            val enabledPeers = getAllPeersInfo()
-                .filter { it.isEnabled }
-                .map { it.uri }
-
-            // If no enabled peers and not using defaults, return empty list
+            // No custom peers and not using defaults - return empty list
             // This allows multicast-only mode
-            enabledPeers
+            emptyList()
         }
     }
 
@@ -430,5 +443,91 @@ class ConfigRepository(private val context: Context) {
      */
     fun setTheme(theme: String) {
         prefs.edit { putString(KEY_THEME, theme) }
+    }
+
+    // ============================================
+    // Discovered Peers Caching
+    // ============================================
+
+    /**
+     * Get cached discovered peers if within TTL
+     * @return List of discovered peers or null if cache is expired/empty
+     */
+    fun getCachedDiscoveredPeers(): List<DiscoveredPeer>? {
+        return try {
+            val cachedJson = prefs.getString(KEY_CACHED_DISCOVERED_PEERS, null)
+            val timestamp = prefs.getLong(KEY_CACHE_TIMESTAMP, 0)
+
+            if (cachedJson.isNullOrEmpty() || timestamp == 0L) {
+                return null
+            }
+
+            // Check TTL
+            val currentTime = System.currentTimeMillis()
+            val cacheAge = currentTime - timestamp
+            val cacheTTL = CACHE_TTL_HOURS * 60 * 60 * 1000L // Convert hours to milliseconds
+
+            if (cacheAge > cacheTTL) {
+                Log.d(TAG, "Discovered peers cache expired (age: ${cacheAge / 1000 / 60 / 60}h)")
+                return null
+            }
+
+            // Parse JSON array
+            val jsonArray = JSONArray(cachedJson)
+            val peers = mutableListOf<DiscoveredPeer>()
+            for (i in 0 until jsonArray.length()) {
+                peers.add(DiscoveredPeer.fromJson(jsonArray.getJSONObject(i)))
+            }
+
+            Log.d(TAG, "Retrieved ${peers.size} cached discovered peers (age: ${cacheAge / 1000 / 60}min)")
+            peers
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting cached discovered peers", e)
+            null
+        }
+    }
+
+    /**
+     * Cache discovered peers with current timestamp
+     * @param peers List of discovered peers to cache
+     */
+    fun cacheDiscoveredPeers(peers: List<DiscoveredPeer>) {
+        try {
+            val jsonArray = JSONArray()
+            peers.forEach { peer ->
+                val json = org.json.JSONObject().apply {
+                    put("address", peer.address)
+                    put("protocol", peer.protocol)
+                    put("region", peer.region)
+                    put("rtt", peer.rtt)
+                    put("available", peer.available)
+                    put("response_ms", peer.responseMs)
+                    put("last_seen", peer.lastSeen)
+                }
+                jsonArray.put(json)
+            }
+
+            prefs.edit {
+                putString(KEY_CACHED_DISCOVERED_PEERS, jsonArray.toString())
+                putLong(KEY_CACHE_TIMESTAMP, System.currentTimeMillis())
+            }
+
+            Log.d(TAG, "Cached ${peers.size} discovered peers")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error caching discovered peers", e)
+        }
+    }
+
+    /**
+     * Clear cached discovered peers
+     */
+    fun clearCachedDiscoveredPeers() {
+        prefs.edit {
+            remove(KEY_CACHED_DISCOVERED_PEERS)
+            remove(KEY_CACHE_TIMESTAMP)
+        }
+        Log.d(TAG, "Cleared discovered peers cache")
     }
 }

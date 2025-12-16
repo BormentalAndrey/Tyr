@@ -37,6 +37,11 @@
     <string name="service_error">Ошибка</string>
     <string name="service_error_desc">Не удалось запустить службу</string>
 
+    <!-- Connection Status (for notification) -->
+    <string name="connection_online">В сети</string>
+    <string name="connection_offline">Не в сети</string>
+    <string name="connection_connecting">Подключение…</string>
+
     <!-- Status Display -->
     <string name="status_starting">Запуск…</string>
     <string name="status_running">Работает</string>
@@ -110,6 +115,8 @@
     <string name="configure_peers_title">Настроить пиры</string>
     <string name="configure_peers_description">Управление подключениями к пирам сети Yggdrasil</string>
     <string name="use_default_peers">Использовать пиры по умолчанию</string>
+    <string name="use_default_peers_description">Подключаться используя встроенный список пиров</string>
+    <string name="peer_onboarding_instructions">Выберите способ подключения к сети Yggdrasil:\n\n• Включите переключатель для использования пиров по умолчанию\n• Или нажмите \"Поиск пиров\" для обнаружения доступных пиров</string>
     <string name="custom_peers">Пользовательские пиры</string>
     <string name="add_peer">Добавить пир</string>
     <string name="edit_peer">Редактировать пир</string>
@@ -266,4 +273,31 @@
 • Material Components (Apache 2.0)\n
 • И другие…
 </string>
+
+    <!-- Peer Discovery -->
+    <string name="peer_add_manually">Добавить вручную</string>
+    <string name="peer_find_peers">Найти пиры</string>
+    <string name="peer_discovery_searching">Поиск пиров…</string>
+    <string name="peer_discovery_progress_percent">Поиск: %d%%</string>
+    <string name="peer_discovery_discovered_peers">Найденные пиры</string>
+    <string name="peer_discovery_no_peers_found">Пиры не найдены</string>
+    <string name="peer_filter_all">Все</string>
+    <string name="peer_select_all">Выбрать все</string>
+    <string name="peer_deselect_all">Снять выделение</string>
+    <string name="peer_add_selected">Добавить выбранные</string>
+    <string name="peer_discovery_progress">Проверка %1$d / %2$d пиров…</string>
+    <string name="peer_discovery_progress_detailed">Найдено %1$d из %2$d пиров (всего %3$d)</string>
+    <string name="peer_discovery_found">Найдено: %d пиров</string>
+    <string name="peer_discovery_total_available">Доступно пиров: %d</string>
+    <string name="peer_discovery_selected">Выбрано: %d</string>
+    <string name="peer_added">Успешно добавлено пиров: %d</string>
+    <string name="peers_added">Добавлено пиров: %d</string>
+    <string name="peer_discovery_error">Не удалось найти пиры: %s</string>
+    <string name="peer_discovery_no_network">Нет подключения к сети</string>
+    <string name="peer_discovery_no_network_message">Невозможно найти пиры без подключения к интернету. Используйте дефолтные пиры или добавьте вручную.</string>
+    <string name="peer_discovery_in_progress">Поиск пиров уже выполняется</string>
+    <string name="peer_from_cache">Из кэша (24ч)</string>
+    <string name="using_default_peers">Используются дефолтные пиры</string>
+    <string name="all_peers_already_exist">Все выбранные пиры уже существуют</string>
+    <string name="error_no_peers_selected">Пожалуйста, выберите хотя бы один пир или используйте дефолтные пиры</string>
 </resources>
