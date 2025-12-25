@@ -17,6 +17,7 @@
     <string name="restart_now">Перезапустить сейчас</string>
     <string name="restart_later">Позже</string>
     <string name="or">ИЛИ</string>
+    <string name="loading">Загрузка…</string>
 
     <!-- Notification Channels -->
     <string name="notification_channel_service">Служба Yggmail</string>
@@ -300,4 +301,35 @@
     <string name="using_default_peers">Используются дефолтные пиры</string>
     <string name="all_peers_already_exist">Все выбранные пиры уже существуют</string>
     <string name="error_no_peers_selected">Пожалуйста, выберите хотя бы один пир или используйте дефолтные пиры</string>
+
+    <!-- Storage Settings -->
+    <string name="storage_settings">Хранилище</string>
+    <string name="storage_and_quota">Хранилище и квота</string>
+    <string name="unread_quota">Лимит размера сообщения</string>
+    <string name="unread_quota_description">Максимальный размер файла для входящих сообщений</string>
+    <string name="quota_usage_label">Ограничения</string>
+    <string name="storage_statistics">Статистика хранилища</string>
+
+    <!-- Quota Dialog -->
+    <string name="loading_quota_info">Загрузка информации о лимите…</string>
+    <string name="error_loading_quota">Не удалось загрузить информацию о лимите</string>
+    <string name="saving_quota">Сохранение лимита…</string>
+    <string name="error_saving_quota">Не удалось сохранить лимит</string>
+    <string name="quota_saved">Лимит установлен на %d МБ</string>
+    <string name="quota_current_value">Лимит: %d МБ</string>
+    <string name="quota_usage_format">Использовано: %s МБ / %d МБ (%d%%)</string>
+    <string name="quota_unread_count">Непрочитанных сообщений: %d</string>
+    <string name="quota_exceeded_warning">Сообщения превышающие лимит будут отклонены.</string>
+    <string name="max_file_size">Максимальный размер файла для входящих сообщений: %d МБ</string>
+
+    <!-- Storage Stats Dialog -->
+    <string name="loading_storage_stats">Загрузка статистики хранилища…</string>
+    <string name="error_loading_storage_stats">Не удалось загрузить статистику хранилища</string>
+    <string name="storage_db_size">База данных (малые сообщения): %.2f МБ</string>
+    <string name="storage_file_size">Файлы (большие сообщения): %.2f МБ</string>
+    <string name="storage_total_size">Всего: %.2f МБ</string>
+
+    <!-- Service Errors -->
+    <string name="error_service_not_running">Сервис не запущен</string>
+    <string name="error_service_not_available">Сервис недоступен</string>
 </resources>

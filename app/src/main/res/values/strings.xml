@@ -17,6 +17,7 @@
     <string name="restart_now">Restart Now</string>
     <string name="restart_later">Later</string>
     <string name="or">OR</string>
+    <string name="loading">Loading…</string>
 
     <!-- Notification Channels -->
     <string name="notification_channel_service">Yggmail Service</string>
@@ -299,4 +300,35 @@
     <string name="using_default_peers">Using default peers</string>
     <string name="all_peers_already_exist">All selected peers already exist</string>
     <string name="error_no_peers_selected">Please select at least one peer or use default peers</string>
+
+    <!-- Storage Settings -->
+    <string name="storage_settings">Storage</string>
+    <string name="storage_and_quota">Storage &amp; Quota</string>
+    <string name="unread_quota">Message Size Limit</string>
+    <string name="unread_quota_description">Maximum file size for incoming messages</string>
+    <string name="quota_usage_label">Limitations</string>
+    <string name="storage_statistics">Storage Statistics</string>
+
+    <!-- Quota Dialog -->
+    <string name="loading_quota_info">Loading size limit information…</string>
+    <string name="error_loading_quota">Failed to load size limit information</string>
+    <string name="saving_quota">Saving size limit…</string>
+    <string name="error_saving_quota">Failed to save size limit</string>
+    <string name="quota_saved">Size limit set to %d MB</string>
+    <string name="quota_current_value">Size limit: %d MB</string>
+    <string name="quota_usage_format">Used: %s MB / %d MB (%d%%)</string>
+    <string name="quota_unread_count">Unread messages: %d</string>
+    <string name="quota_exceeded_warning">Messages exceeding size limit will be rejected.</string>
+    <string name="max_file_size">Maximum file size for incoming messages: %d MB</string>
+
+    <!-- Storage Stats Dialog -->
+    <string name="loading_storage_stats">Loading storage statistics…</string>
+    <string name="error_loading_storage_stats">Failed to load storage statistics</string>
+    <string name="storage_db_size">Database (small messages): %.2f MB</string>
+    <string name="storage_file_size">Files (large messages): %.2f MB</string>
+    <string name="storage_total_size">Total: %.2f MB</string>
+
+    <!-- Service Errors -->
+    <string name="error_service_not_running">Service is not running</string>
+    <string name="error_service_not_available">Service is not available</string>
 </resources>

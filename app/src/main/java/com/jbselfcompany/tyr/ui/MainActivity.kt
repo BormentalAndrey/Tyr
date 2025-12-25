@@ -54,6 +54,9 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             TyrApplication.instance.yggmailServiceBinder = binder
 
             yggmailService?.addStatusListener(this@MainActivity)
+
+            // Update storage and quota info when service connects
+            updateStorageInfo()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -94,6 +97,8 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         yggmailService?.setAppActive(true)
         // Start network monitoring
         startNetworkMonitoring()
+        // Update storage info
+        updateStorageInfo()
     }
 
     override fun onPause() {
@@ -192,6 +197,10 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             binding.buttonToggleService.text = getString(R.string.start_service)
             binding.buttonToggleService.setIconResource(R.drawable.ic_play_arrow)
         }
+
+        // Update storage info
+        // This function will handle visibility based on service state
+        updateStorageInfo()
     }
 
     private fun setupDeltaChat() {
@@ -609,5 +618,48 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      */
     private fun Int.dpToPx(): Int {
         return (this * resources.displayMetrics.density).toInt()
+    }
+
+    /**
+     * Update storage and quota info card
+     * Shows message size limit and storage statistics
+     */
+    private fun updateStorageInfo() {
+        if (!YggmailService.isRunning) {
+            binding.cardStorageQuota.visibility = View.GONE
+            return
+        }
+
+        // Show card immediately if service is running
+        binding.cardStorageQuota.visibility = View.VISIBLE
+
+        Thread {
+            val quotaInfo = yggmailService?.getUnreadQuotaInfo()
+            val storageStats = yggmailService?.getMailStorageStats()
+
+            runOnUiThread {
+                if (quotaInfo == null || storageStats == null) {
+                    // Keep card visible but don't update data
+                    return@runOnUiThread
+                }
+
+                // Show only quota limit (maximum file size)
+                val quotaText = getString(R.string.max_file_size, quotaInfo.quotaMB)
+                binding.textQuotaInfo.text = quotaText
+
+                // Hide progress bar
+                binding.quotaInfoProgress.visibility = View.GONE
+
+                // Update storage statistics
+                val storageText = buildString {
+                    append(getString(R.string.storage_db_size, storageStats.dbSizeMB))
+                    append("\n")
+                    append(getString(R.string.storage_file_size, storageStats.fileSizeMB))
+                    append("\n")
+                    append(getString(R.string.storage_total_size, storageStats.totalSizeMB))
+                }
+                binding.textStorageInfo.text = storageText
+            }
+        }.start()
     }
 }

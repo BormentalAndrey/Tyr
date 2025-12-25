@@ -1195,6 +1195,140 @@ class YggmailService : Service(), LogCallback {
             performSoftStopSync()
         }
     }
+
+    // ========== Quota Management ==========
+
+    /**
+     * Set unread quota in megabytes
+     * @param quotaMB Quota size in megabytes
+     * @return true on success, false on error
+     */
+    fun setUnreadQuotaMB(quotaMB: Long): Boolean {
+        val latch = CountDownLatch(1)
+        var success = false
+        var error: Exception? = null
+
+        serviceHandler.post {
+            try {
+                yggmailService?.setUnreadQuotaMB(quotaMB)
+                success = true
+                Log.i(TAG, "Unread quota set to ${quotaMB}MB")
+            } catch (e: Exception) {
+                error = e
+                Log.e(TAG, "Error setting unread quota", e)
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout setting unread quota")
+            return false
+        }
+
+        return success && error == null
+    }
+
+    /**
+     * Data class for message size limit (quota)
+     */
+    data class UnreadQuotaInfo(
+        val quotaMB: Long  // Maximum message size limit in MB
+    )
+
+    /**
+     * Get message size limit information
+     * @return UnreadQuotaInfo object, or null on error
+     */
+    fun getUnreadQuotaInfo(): UnreadQuotaInfo? {
+        val latch = CountDownLatch(1)
+        var result: UnreadQuotaInfo? = null
+        var error: Exception? = null
+
+        serviceHandler.post {
+            try {
+                val info = yggmailService?.unreadQuotaInfo
+                if (info != null) {
+                    result = UnreadQuotaInfo(
+                        quotaMB = info.quotaMB
+                    )
+                }
+            } catch (e: Exception) {
+                error = e
+                Log.e(TAG, "Error getting quota info", e)
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout getting quota info")
+            return null
+        }
+
+        if (error != null) {
+            return null
+        }
+
+        return result
+    }
+
+    // ========== Storage Statistics ==========
+
+    /**
+     * Data class for mail storage statistics
+     */
+    data class MailStorageStats(
+        val dbSizeMB: Double,     // Database BLOB size in MB
+        val fileSizeMB: Double,   // File storage size in MB
+        val totalSizeMB: Double   // Total storage size in MB
+    )
+
+    /**
+     * Get mail storage statistics
+     * @return MailStorageStats object, or null on error
+     */
+    fun getMailStorageStats(): MailStorageStats? {
+        val latch = CountDownLatch(1)
+        var result: MailStorageStats? = null
+        var error: Exception? = null
+
+        serviceHandler.post {
+            try {
+                val stats = yggmailService?.mailStorageStats
+                if (stats != null) {
+                    // Convert bytes to MB using auto-generated getter methods
+                    // Gomobile converts DbSize -> getDbSize(), FileSize -> getFileSize()
+                    val dbSizeMB = stats.dbSize / (1024.0 * 1024.0)
+                    val fileSizeMB = stats.fileSize / (1024.0 * 1024.0)
+                    val totalSizeMB = dbSizeMB + fileSizeMB
+
+                    result = MailStorageStats(
+                        dbSizeMB = dbSizeMB,
+                        fileSizeMB = fileSizeMB,
+                        totalSizeMB = totalSizeMB
+                    )
+                }
+            } catch (e: Exception) {
+                error = e
+                Log.e(TAG, "Error getting mail storage stats", e)
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout getting mail storage stats")
+            return null
+        }
+
+        if (error != null) {
+            return null
+        }
+
+        return result
+    }
+
 }
 
 /**

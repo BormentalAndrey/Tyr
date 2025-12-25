@@ -53,9 +53,12 @@ But there is a network, called **[Yggdrasil](https://yggdrasil-network.github.io
 | 📧 **Local SMTP/IMAP Server** | Complete mail server running directly on your device |
 | 🔐 **Cryptographic Identity** | Automatic Ed25519 key generation - your mail identity cannot be spoofed |
 | 🌍 **Yggdrasil Network** | Connect via configurable peers - censorship-resistant by design |
+| 🔍 **Auto-Peer Discovery** | Automatic peer discovery with RTT-based sorting for optimal performance |
+| 🔔 **Push Notifications** | Instant message delivery with minimal battery impact |
 | 🚀 **Auto-Start on Boot** | Always-on availability for incoming messages |
 | 💾 **Encrypted Backup & Restore** | Password-protected configuration with optional key export |
-| 🔋 **Battery Optimized** | Sophisticated power management with timed wake locks |
+| 🔋 **Extreme Battery Optimization** | 10-15x improvement: 1-3%/hour (was 15-30%), 98% fewer packets, full Doze Mode support |
+| 📊 **Advanced Logging** | Period selection, log archiving, and real-time monitoring |
 
 ---
 
@@ -121,6 +124,7 @@ If automatic setup doesn't work:
 - **Local-Only Access**: SMTP/IMAP ports bound to localhost only
 - **Cryptographic Identity**: Ed25519 keys ensure your mail address cannot be spoofed
 - **Encrypted Backups**: Configuration and keys backed up with password protection
+- **Privacy-First Push**: Instant notifications without third-party push services or metadata exposure
 
 ---
 

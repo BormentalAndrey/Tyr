@@ -48,6 +48,8 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
         private const val ID_CHANGE_PASSWORD = 7
         private const val ID_REGENERATE_KEYS = 8
         private const val ID_BACKUP_RESTORE = 9
+        private const val ID_HEADER_STORAGE = 19
+        private const val ID_UNREAD_QUOTA = 20
         private const val ID_HEADER_APPEARANCE = 10
         private const val ID_LANGUAGE = 11
         private const val ID_THEME = 12
@@ -162,6 +164,23 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
             )
         )
 
+        // Storage Settings Section
+        settingsItems.add(
+            SettingsAdapter.Item(
+                id = ID_HEADER_STORAGE,
+                titleRes = R.string.storage_settings,
+                type = SettingsAdapter.ItemType.HEADER
+            )
+        )
+        settingsItems.add(
+            SettingsAdapter.Item(
+                id = ID_UNREAD_QUOTA,
+                titleRes = R.string.unread_quota,
+                descriptionRes = R.string.unread_quota_description,
+                type = SettingsAdapter.ItemType.PLAIN
+            )
+        )
+
         // Appearance Settings Section
         settingsItems.add(
             SettingsAdapter.Item(
@@ -263,6 +282,7 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
             ID_CHANGE_PASSWORD -> showChangePasswordDialog()
             ID_REGENERATE_KEYS -> showRegenerateKeysDialog()
             ID_BACKUP_RESTORE -> showBackupRestoreOptions()
+            ID_UNREAD_QUOTA -> showUnreadQuotaDialog()
             ID_LANGUAGE -> showLanguageDialog()
             ID_THEME -> showThemeDialog()
             ID_COLLECT_LOGS -> startActivity(Intent(this, LogsActivity::class.java))
@@ -714,6 +734,104 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
             else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
         AppCompatDelegate.setDefaultNightMode(mode)
+    }
+
+    private fun showUnreadQuotaDialog() {
+        if (!YggmailService.isRunning) {
+            Toast.makeText(this, R.string.error_service_not_running, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val binder = TyrApplication.instance.yggmailServiceBinder
+        val service = binder?.getService()
+
+        if (service == null) {
+            Toast.makeText(this, R.string.error_service_not_available, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Show loading while fetching quota info
+        showLoadingOverlay(true, getString(R.string.loading_quota_info))
+
+        Thread {
+            val quotaInfo = service.getUnreadQuotaInfo()
+            val storageStats = service.getMailStorageStats()
+
+            runOnUiThread {
+                showLoadingOverlay(false)
+
+                if (quotaInfo == null) {
+                    Toast.makeText(this, R.string.error_loading_quota, Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+
+                // Show dialog with slider
+                val dialogView = layoutInflater.inflate(R.layout.dialog_unread_quota, null)
+                val slider = dialogView.findViewById<com.google.android.material.slider.Slider>(R.id.quota_slider)
+                val textCurrent = dialogView.findViewById<android.widget.TextView>(R.id.text_current_quota)
+                val textStorageStats = dialogView.findViewById<android.widget.TextView>(R.id.text_storage_stats)
+
+                // Configure slider (10 MB - 500 MB, step 10 MB)
+                slider.valueFrom = 10f
+                slider.valueTo = 500f
+                slider.stepSize = 10f
+                slider.value = quotaInfo.quotaMB.toFloat()
+
+                // Update current quota text
+                textCurrent.text = getString(R.string.quota_current_value, quotaInfo.quotaMB)
+
+                // Update storage statistics
+                if (storageStats != null) {
+                    val statsText = buildString {
+                        append(getString(R.string.storage_db_size, storageStats.dbSizeMB))
+                        append("\n")
+                        append(getString(R.string.storage_file_size, storageStats.fileSizeMB))
+                        append("\n")
+                        append(getString(R.string.storage_total_size, storageStats.totalSizeMB))
+                    }
+                    textStorageStats.text = statsText
+                } else {
+                    textStorageStats.text = getString(R.string.error_loading_storage_stats)
+                }
+
+                // Update text when slider changes
+                slider.addOnChangeListener { _, value, _ ->
+                    textCurrent.text = getString(R.string.quota_current_value, value.toLong())
+                }
+
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.unread_quota)
+                    .setView(dialogView)
+                    .setPositiveButton(R.string.save) { _, _ ->
+                        val newQuota = slider.value.toLong()
+                        saveUnreadQuota(service, newQuota)
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
+        }.start()
+    }
+
+    private fun saveUnreadQuota(service: YggmailService, quotaMB: Long) {
+        showLoadingOverlay(true, getString(R.string.saving_quota))
+
+        Thread {
+            val success = service.setUnreadQuotaMB(quotaMB)
+
+            runOnUiThread {
+                showLoadingOverlay(false)
+
+                if (success) {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.quota_saved, quotaMB),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(this, R.string.error_saving_quota, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 
     private fun showClearLogsDialog() {
