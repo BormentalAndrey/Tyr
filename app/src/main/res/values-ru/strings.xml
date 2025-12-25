@@ -68,8 +68,12 @@
     <string name="peer_latency_unknown">Задержка: измеряется…</string>
     <string name="yggdrasil_peers">Yggdrasil пиры</string>
 
-    <string name="copy_address">Копировать адрес</string>
+    <string name="copy_address">Копировать</string>
+    <string name="show_qr_code">QR-код</string>
     <string name="address_copied">Адрес скопирован в буфер обмена</string>
+    <string name="share_mailto">Поделиться</string>
+    <string name="qr_code_title">QR-код почтового адреса</string>
+    <string name="qr_code_error">Не удалось создать QR-код</string>
     <string name="setup_deltachat">Настроить DeltaChat/ArcaneChat</string>
     <string name="dcaccount_opened">Открываю приложение с автоконфигурацией…</string>
     <string name="dcaccount_copied">Ссылка DCACCOUNT скопирована! Откройте DeltaChat/ArcaneChat и вставьте её в экран настройки</string>
@@ -81,7 +85,12 @@
     <string name="imap_server">IMAP: %1$s:%2$s</string>
     <string name="deltachat_setup">Настройка DeltaChat/ArcaneChat</string>
     <string name="deltachat_setup_hint">Нажмите для просмотра инструкций</string>
-    <string name="deltachat_instructions">Настройка DeltaChat/ArcaneChat:\n\n1. Установите и откройте приложение DeltaChat/ArcaneChat\n2. Нажмите \"Создать новый профиль\"\n3. Введите имя, при необходимости выберите аватар в верхней части экрана\n4. Нажмите \"Использовать другой сервер\" (под полями входа)\n5. Введите ваш email-адрес, указанный выше\n6. Введите пароль, установленный при первоначальной настройке\n7. Нажмите \"✓\" в правом верхнем углу для начала общения\n\nУбедитесь, что служба Tyr запущена перед использованием DeltaChat/ArcaneChat.</string>
+    <string name="deltachat_instructions">Настройка DeltaChat/ArcaneChat:\n\n1. Установите и откройте приложение DeltaChat/ArcaneChat\n2. Нажмите \"Создать новый профиль\"\n3. Введите имя, при необходимости выберите аватар в верхней части экрана\n4. Нажмите \"Использовать другой сервер\" (под полями входа)\n5. Введите ваш email-адрес: %1$s\n6. Введите пароль, установленный при первоначальной настройке\n7. Нажмите \"✓\" в правом верхнем углу для начала общения\n\nУбедитесь, что служба Tyr запущена перед использованием DeltaChat/ArcaneChat.</string>
+    <string name="email_client_setup_title">Настройка почтовых клиентов</string>
+    <string name="email_client_setup_hint">Нажмите для просмотра инструкций для K-9 Mail, Thunderbird, FairEmail</string>
+    <string name="your_email_address">ваш-email@yggmail</string>
+    <string name="your_password">ваш-пароль</string>
+    <string name="email_client_instructions">Настройка почтовых клиентов:\n\nEmail: %1$s\nПароль: %2$s\n\nIMAP (Входящие):\n  Сервер: 127.0.0.1\n  Порт: 1143\n  Шифрование: Нет\n\nSMTP (Исходящие):\n  Сервер: 127.0.0.1\n  Порт: 1025\n  Шифрование: Нет\n\n\nK-9 Mail / Thunderbird Mobile:\n\n1. Откройте приложение, нажмите Добавить аккаунт, затем Ручная настройка\n2. Введите ваш email и пароль\n3. Для IMAP: 127.0.0.1:1143 (без шифрования)\n4. Для SMTP: 127.0.0.1:1025 (без шифрования)\n5. Завершите настройку\n\n\nFairEmail:\n\n1. Откройте приложение, нажмите Ручная настройка, затем Пользовательский\n2. Введите ваш email и пароль\n3. IMAP: 127.0.0.1:1143 (без шифрования)\n4. SMTP: 127.0.0.1:1025 (без шифрования)\n5. Сохраните конфигурацию\n\n\nВажно:\n\n- Служба Tyr должна быть запущена\n- Используйте \"Нет\" для шифрования (локальное соединение)\n- Имя пользователя - ваш полный email адрес</string>
 
     <!-- Onboarding -->
     <string name="welcome_to_tyr">Добро пожаловать в Tyr</string>

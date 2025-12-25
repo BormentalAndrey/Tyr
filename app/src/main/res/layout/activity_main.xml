@@ -202,16 +202,36 @@
                         app:icon="@drawable/ic_play_arrow"
                         tools:visibility="visible" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/button_copy_address"
-                        style="@style/Widget.Material3.Button.TonalButton"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="@string/copy_address"
-                        android:visibility="gone"
-                        app:icon="@drawable/ic_play_arrow"
-                        tools:visibility="visible" />
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/button_copy_address"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
+                            android:text="@string/copy_address"
+                            android:visibility="gone"
+                            app:icon="@drawable/ic_play_arrow"
+                            tools:visibility="visible" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/button_show_qr"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/show_qr_code"
+                            android:visibility="gone"
+                            app:icon="@drawable/ic_play_arrow"
+                            tools:visibility="visible" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 
@@ -291,11 +311,12 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Instructions Card -->
+            <!-- DeltaChat/ArcaneChat Setup Card -->
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/card_instructions"
+                android:id="@+id/card_deltachat_setup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
                 app:cardElevation="2dp">
 
                 <LinearLayout
@@ -315,6 +336,36 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:text="@string/deltachat_setup_hint"
+                        android:textAppearance="?attr/textAppearanceBody2" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Email Client Setup Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/card_email_client_setup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardElevation="2dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/email_client_setup_title"
+                        android:textAppearance="?attr/textAppearanceHeadline6" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/email_client_setup_hint"
                         android:textAppearance="?attr/textAppearanceBody2" />
 
                 </LinearLayout>

@@ -29,6 +29,11 @@ import com.jbselfcompany.tyr.utils.AutoconfigServer
 import com.jbselfcompany.tyr.utils.NetworkStatsMonitor
 import com.jbselfcompany.tyr.utils.PermissionManager
 import android.util.Log
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.widget.ImageView
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 
 /**
  * Main activity displaying service status and mail configuration.
@@ -148,9 +153,22 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             }
         }
 
-        // Setup instructions card
-        binding.cardInstructions.setOnClickListener {
-            showInstructionsDialog()
+        // Show QR code button
+        binding.buttonShowQr.setOnClickListener {
+            val address = configRepository.getMailAddress()
+            if (!address.isNullOrEmpty()) {
+                showQrCodeDialog(address)
+            }
+        }
+
+        // DeltaChat setup instructions card
+        binding.cardDeltachatSetup.setOnClickListener {
+            showDeltaChatInstructionsDialog()
+        }
+
+        // Email client setup instructions card
+        binding.cardEmailClientSetup.setOnClickListener {
+            showEmailClientInstructionsDialog()
         }
 
         updateUI()
@@ -179,10 +197,12 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             binding.textMailAddress.visibility = View.VISIBLE
             binding.buttonSetupDeltachat.visibility = View.VISIBLE
             binding.buttonCopyAddress.visibility = View.VISIBLE
+            binding.buttonShowQr.visibility = View.VISIBLE
         } else {
             binding.textMailAddress.visibility = View.GONE
             binding.buttonSetupDeltachat.visibility = View.GONE
             binding.buttonCopyAddress.visibility = View.GONE
+            binding.buttonShowQr.visibility = View.GONE
         }
 
         // SMTP/IMAP info
@@ -338,10 +358,93 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         ).show()
     }
 
-    private fun showInstructionsDialog() {
+    private fun showQrCodeDialog(mailAddress: String) {
+        try {
+            // Generate mailto URL
+            val mailtoUrl = "mailto:$mailAddress"
+
+            // Generate QR code
+            val qrBitmap = generateQrCode(mailtoUrl, 512, 512)
+
+            // Create ImageView for QR code
+            val imageView = ImageView(this).apply {
+                setImageBitmap(qrBitmap)
+                setPadding(32, 32, 32, 32)
+            }
+
+            // Show dialog
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.qr_code_title)
+                .setView(imageView)
+                .setPositiveButton(R.string.ok, null)
+                .setNeutralButton(R.string.share_mailto) { _, _ ->
+                    shareMailto(mailtoUrl)
+                }
+                .show()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error generating QR code", e)
+            Snackbar.make(
+                binding.root,
+                R.string.qr_code_error,
+                Snackbar.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun shareMailto(mailtoUrl: String) {
+        try {
+            val sendIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, mailtoUrl)
+                type = "text/plain"
+            }
+            val shareIntent = Intent.createChooser(sendIntent, null)
+            startActivity(shareIntent)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error sharing mailto URL", e)
+            Snackbar.make(
+                binding.root,
+                R.string.qr_code_error,
+                Snackbar.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun generateQrCode(content: String, width: Int, height: Int): Bitmap {
+        val writer = QRCodeWriter()
+        val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, width, height)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+
+        for (x in 0 until width) {
+            for (y in 0 until height) {
+                bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
+            }
+        }
+
+        return bitmap
+    }
+
+    private fun showDeltaChatInstructionsDialog() {
+        val mailAddress = configRepository.getMailAddress() ?: getString(R.string.your_email_address)
+
+        val instructions = getString(R.string.deltachat_instructions, mailAddress)
+
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.deltachat_setup)
-            .setMessage(R.string.deltachat_instructions)
+            .setMessage(instructions)
+            .setPositiveButton(R.string.ok, null)
+            .show()
+    }
+
+    private fun showEmailClientInstructionsDialog() {
+        val mailAddress = configRepository.getMailAddress() ?: getString(R.string.your_email_address)
+        val password = getString(R.string.your_password)
+
+        val instructions = getString(R.string.email_client_instructions, mailAddress, password)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.email_client_setup_title)
+            .setMessage(instructions)
             .setPositiveButton(R.string.ok, null)
             .show()
     }

@@ -67,8 +67,12 @@
     <string name="peer_latency_format">Latency: %d ms</string>
     <string name="peer_latency_unknown">Latency: measuring…</string>
     <string name="yggdrasil_peers">Yggdrasil Peers</string>
-    <string name="copy_address">Copy Address</string>
+    <string name="copy_address">Copy</string>
+    <string name="show_qr_code">QR Code</string>
     <string name="address_copied">Address copied to clipboard</string>
+    <string name="share_mailto">Share</string>
+    <string name="qr_code_title">Mail Address QR Code</string>
+    <string name="qr_code_error">Failed to generate QR code</string>
     <string name="setup_deltachat">Setup DeltaChat/ArcaneChat</string>
     <string name="dcaccount_opened">Opening app with autoconfig…</string>
     <string name="dcaccount_copied">DCACCOUNT link copied! Open DeltaChat/ArcaneChat and paste it in the setup screen</string>
@@ -80,7 +84,12 @@
     <string name="imap_server">IMAP: %1$s:%2$s</string>
     <string name="deltachat_setup">DeltaChat/ArcaneChat Setup</string>
     <string name="deltachat_setup_hint">Tap to view setup instructions</string>
-    <string name="deltachat_instructions">DeltaChat/ArcaneChat setup:\n\n1. Install and open the DeltaChat/ArcaneChat app\n2. Click on "Create a new profile"\n3. Enter a name and select an avatar at the top of the screen if necessary\n4. Click on "Use a different server" (below the login fields)\n5. Enter your email address from above\n6. Enter the password set during the initial setup\n7. Click "✓" in the top right corner to start chatting. Make sure the Tyr service is running before using DeltaChat/ArcaneChat.</string>
+    <string name="deltachat_instructions">DeltaChat/ArcaneChat setup:\n\n1. Install and open the DeltaChat/ArcaneChat app\n2. Click on "Create a new profile"\n3. Enter a name and select an avatar at the top of the screen if necessary\n4. Click on "Use a different server" (below the login fields)\n5. Enter your email address: %1$s\n6. Enter the password set during the initial setup\n7. Click "✓" in the top right corner to start chatting\n\nMake sure the Tyr service is running before using DeltaChat/ArcaneChat.</string>
+    <string name="email_client_setup_title">Email Client Setup</string>
+    <string name="email_client_setup_hint">Tap to view setup instructions for K-9 Mail, Thunderbird, FairEmail</string>
+    <string name="your_email_address">your-email@yggmail</string>
+    <string name="your_password">your-password</string>
+    <string name="email_client_instructions">Email Client Setup:\n\nEmail: %1$s\nPassword: %2$s\n\nIMAP (Incoming):\n  Server: 127.0.0.1\n  Port: 1143\n  Security: None\n\nSMTP (Outgoing):\n  Server: 127.0.0.1\n  Port: 1025\n  Security: None\n\n\nK-9 Mail / Thunderbird Mobile:\n\n1. Open app, tap Add Account, then Manual Setup\n2. Enter your email and password\n3. For IMAP: 127.0.0.1:1143 (no encryption)\n4. For SMTP: 127.0.0.1:1025 (no encryption)\n5. Complete setup\n\n\nFairEmail:\n\n1. Open app, tap Manual Setup, then Custom\n2. Enter your email and password\n3. IMAP: 127.0.0.1:1143 (no encryption)\n4. SMTP: 127.0.0.1:1025 (no encryption)\n5. Save configuration\n\n\nImportant:\n\n- Tyr service must be running\n- Use "None" for encryption (local connection)\n- Username is your full email address</string>
 
     <!-- Onboarding -->
     <string name="welcome_to_tyr">Welcome to Tyr</string>

@@ -50,6 +50,8 @@ But there is a network, called **[Yggdrasil](https://yggdrasil-network.github.io
 | Feature | Description |
 |---------|-------------|
 | 🔗 **Full DeltaChat/ArcaneChat Integration** | Seamless setup with the best decentralized messengers |
+| 📧 **Email Client Support** | Works with K-9 Mail, Thunderbird Mobile, FairEmail, and any SMTP/IMAP client |
+| 📱 **QR Code Sharing** | Generate and share mailto: links via QR codes |
 | 📧 **Local SMTP/IMAP Server** | Complete mail server running directly on your device |
 | 🔐 **Cryptographic Identity** | Automatic Ed25519 key generation - your mail identity cannot be spoofed |
 | 🌍 **Yggdrasil Network** | Connect via configurable peers - censorship-resistant by design |
@@ -112,7 +114,21 @@ If automatic setup doesn't work:
 5. Enter your Yggmail address and the password you set in Tyr
 6. Tap "✓" to complete setup
 
-> **Important**: Tyr must be running for your chat app to send and receive messages. Enable auto-start in Tyr settings for seamless experience.
+### Setting up Other Email Clients
+
+Tyr works with any standard email client. For K-9 Mail, Thunderbird Mobile, or FairEmail:
+
+1. Complete Tyr onboarding and start the service
+2. In Tyr's main screen, tap **"Email Client Setup"** card for detailed instructions
+3. Configure your email client with:
+   - **Email**: Your mail address from Tyr (e.g., `abc123...@yggmail`)
+   - **Password**: The password you set during Tyr onboarding
+   - **IMAP**: 127.0.0.1:1143 (no encryption)
+   - **SMTP**: 127.0.0.1:1025 (no encryption)
+
+**QR Code Sharing**: Tap the **"QR Code"** button in Tyr to generate a QR code for your mail address. You can share it via the system share sheet to quickly exchange addresses with contacts.
+
+> **Important**: Tyr must be running for your email client to send and receive messages. Enable auto-start in Tyr settings for seamless experience.
 
 ---
 
@@ -192,6 +208,9 @@ Then copy `yggmail.aar` to `Tyr/app/libs/`
 - **[Yggdrasil Network](https://yggdrasil-network.github.io/)**: The mesh network infrastructure
 - **[DeltaChat](https://delta.chat/)**: Recommended email-based messenger client
 - **[ArcaneChat](https://github.com/ArcaneChat/android)**: Alternative email-based messenger client
+- **[K-9 Mail](https://k9mail.app/)**: Open-source email client for Android
+- **[Thunderbird Mobile](https://www.thunderbird.net/mobile/)**: Mozilla's mobile email client (based on K-9)
+- **[FairEmail](https://email.faircode.eu/)**: Privacy-oriented email client for Android
 
 ---
 
