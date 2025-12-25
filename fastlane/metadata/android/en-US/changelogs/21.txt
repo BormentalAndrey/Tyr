@@ -1,0 +1,5 @@
+• Large file support up to 500 MB with automatic storage
+• Unread quota system with configurable limits
+• QR code generation and sharing for mailto: links
+• Pre-send quota check to verify recipient capacity
+• Split setup instructions into DeltaChat and Email Client cards
