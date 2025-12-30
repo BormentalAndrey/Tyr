@@ -737,17 +737,17 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         binding.cardStorageQuota.visibility = View.VISIBLE
 
         Thread {
-            val quotaInfo = yggmailService?.getUnreadQuotaInfo()
+            val maxSizeInfo = yggmailService?.getMaxMessageSizeInfo()
             val storageStats = yggmailService?.getMailStorageStats()
 
             runOnUiThread {
-                if (quotaInfo == null || storageStats == null) {
+                if (maxSizeInfo == null || storageStats == null) {
                     // Keep card visible but don't update data
                     return@runOnUiThread
                 }
 
-                // Show only quota limit (maximum file size)
-                val quotaText = getString(R.string.max_file_size, quotaInfo.quotaMB)
+                // Show only maximum message size (maximum file size)
+                val quotaText = getString(R.string.max_file_size, maxSizeInfo.maxSizeMB)
                 binding.textQuotaInfo.text = quotaText
 
                 // Hide progress bar

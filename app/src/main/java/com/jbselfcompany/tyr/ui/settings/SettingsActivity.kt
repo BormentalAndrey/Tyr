@@ -754,13 +754,13 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
         showLoadingOverlay(true, getString(R.string.loading_quota_info))
 
         Thread {
-            val quotaInfo = service.getUnreadQuotaInfo()
+            val maxSizeInfo = service.getMaxMessageSizeInfo()
             val storageStats = service.getMailStorageStats()
 
             runOnUiThread {
                 showLoadingOverlay(false)
 
-                if (quotaInfo == null) {
+                if (maxSizeInfo == null) {
                     Toast.makeText(this, R.string.error_loading_quota, Toast.LENGTH_SHORT).show()
                     return@runOnUiThread
                 }
@@ -775,10 +775,10 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
                 slider.valueFrom = 10f
                 slider.valueTo = 500f
                 slider.stepSize = 10f
-                slider.value = quotaInfo.quotaMB.toFloat()
+                slider.value = maxSizeInfo.maxSizeMB.toFloat()
 
-                // Update current quota text
-                textCurrent.text = getString(R.string.quota_current_value, quotaInfo.quotaMB)
+                // Update current max size text
+                textCurrent.text = getString(R.string.quota_current_value, maxSizeInfo.maxSizeMB)
 
                 // Update storage statistics
                 if (storageStats != null) {
@@ -816,7 +816,7 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
         showLoadingOverlay(true, getString(R.string.saving_quota))
 
         Thread {
-            val success = service.setUnreadQuotaMB(quotaMB)
+            val success = service.setMaxMessageSizeMB(quotaMB)
 
             runOnUiThread {
                 showLoadingOverlay(false)

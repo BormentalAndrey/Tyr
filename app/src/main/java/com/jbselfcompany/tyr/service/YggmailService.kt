@@ -1199,30 +1199,30 @@ class YggmailService : Service(), LogCallback {
     // ========== Quota Management ==========
 
     /**
-     * Set unread quota in megabytes
-     * @param quotaMB Quota size in megabytes
+     * Set maximum message size in megabytes
+     * @param maxSizeMB Maximum message size in megabytes
      * @return true on success, false on error
      */
-    fun setUnreadQuotaMB(quotaMB: Long): Boolean {
+    fun setMaxMessageSizeMB(maxSizeMB: Long): Boolean {
         val latch = CountDownLatch(1)
         var success = false
         var error: Exception? = null
 
         serviceHandler.post {
             try {
-                yggmailService?.setUnreadQuotaMB(quotaMB)
+                yggmailService?.setMaxMessageSizeMB(maxSizeMB)
                 success = true
-                Log.i(TAG, "Unread quota set to ${quotaMB}MB")
+                Log.i(TAG, "Max message size set to ${maxSizeMB}MB")
             } catch (e: Exception) {
                 error = e
-                Log.e(TAG, "Error setting unread quota", e)
+                Log.e(TAG, "Error setting max message size", e)
             } finally {
                 latch.countDown()
             }
         }
 
         if (!latch.await(5, TimeUnit.SECONDS)) {
-            Log.e(TAG, "Timeout setting unread quota")
+            Log.e(TAG, "Timeout setting max message size")
             return false
         }
 
@@ -1230,39 +1230,39 @@ class YggmailService : Service(), LogCallback {
     }
 
     /**
-     * Data class for message size limit (quota)
+     * Data class for message size limit information
      */
-    data class UnreadQuotaInfo(
-        val quotaMB: Long  // Maximum message size limit in MB
+    data class MaxMessageSizeInfo(
+        val maxSizeMB: Long  // Maximum message size limit in MB
     )
 
     /**
      * Get message size limit information
-     * @return UnreadQuotaInfo object, or null on error
+     * @return MaxMessageSizeInfo object, or null on error
      */
-    fun getUnreadQuotaInfo(): UnreadQuotaInfo? {
+    fun getMaxMessageSizeInfo(): MaxMessageSizeInfo? {
         val latch = CountDownLatch(1)
-        var result: UnreadQuotaInfo? = null
+        var result: MaxMessageSizeInfo? = null
         var error: Exception? = null
 
         serviceHandler.post {
             try {
-                val info = yggmailService?.unreadQuotaInfo
+                val info = yggmailService?.maxMessageSizeInfo
                 if (info != null) {
-                    result = UnreadQuotaInfo(
-                        quotaMB = info.quotaMB
+                    result = MaxMessageSizeInfo(
+                        maxSizeMB = info.maxSizeMB
                     )
                 }
             } catch (e: Exception) {
                 error = e
-                Log.e(TAG, "Error getting quota info", e)
+                Log.e(TAG, "Error getting max message size info", e)
             } finally {
                 latch.countDown()
             }
         }
 
         if (!latch.await(5, TimeUnit.SECONDS)) {
-            Log.e(TAG, "Timeout getting quota info")
+            Log.e(TAG, "Timeout getting max message size info")
             return null
         }
 
