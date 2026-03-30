@@ -274,10 +274,18 @@ class OnboardingPeersFragment : Fragment() {
     }
 
     /**
-     * Validate that either peers are selected or default is chosen
+     * Get manually entered peer URL, or null if empty
+     */
+    fun getManualPeerUrl(): String? {
+        val url = binding.editManualPeer.text?.toString()?.trim()
+        return if (url.isNullOrBlank()) null else url
+    }
+
+    /**
+     * Validate that either peers are selected, default is chosen, or a manual peer is entered
      */
     fun hasValidSelection(): Boolean {
-        return useDefaultPeers || adapter.getSelectedPeers().isNotEmpty()
+        return useDefaultPeers || adapter.getSelectedPeers().isNotEmpty() || !getManualPeerUrl().isNullOrBlank()
     }
 
     /**

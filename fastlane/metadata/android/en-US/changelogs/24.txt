@@ -1,0 +1,4 @@
+• Deeplink support: open Tyr with a pre-filled peer via tyr://open?peer=<url>
+• Manual peer entry in onboarding: enter a custom or local peer address directly
+• Themed icon: monochrome adaptive icon for Android 13+ wallpaper-based theming
+• Peer URL validation centralized and hardened against injection

@@ -238,11 +238,9 @@ class PeersActivity : BaseActivity(), ServiceStatusListener {
                     Toast.makeText(this, "Added tcp:// prefix automatically", Toast.LENGTH_SHORT).show()
                 }
 
-                // Validate protocol
-                val validProtocols = listOf("tcp://", "tls://", "quic://", "socks://", "unix://")
-                val hasValidProtocol = validProtocols.any { peerUrl.startsWith(it) }
-                if (!hasValidProtocol) {
-                    Toast.makeText(this, "Invalid protocol. Use: tcp://, tls://, or quic://", Toast.LENGTH_LONG).show()
+                // Validate protocol and URL structure using shared validator
+                if (!PeerInfo.isValidPeerUrl(peerUrl)) {
+                    Toast.makeText(this, getString(R.string.error_invalid_peer_url), Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
 

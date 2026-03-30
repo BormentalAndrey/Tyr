@@ -27,6 +27,31 @@ data class PeerInfo(
     }
 
     companion object {
+        /** Supported Yggdrasil peer protocols */
+        val VALID_PROTOCOLS = listOf("tcp://", "tls://", "quic://", "socks://", "unix://")
+
+        /**
+         * Validate a peer URL: checks protocol prefix and basic host:port structure,
+         * and rejects characters that could cause injection downstream.
+         */
+        fun isValidPeerUrl(url: String): Boolean {
+            val protocol = VALID_PROTOCOLS.find { url.startsWith(it) } ?: return false
+            val rest = url.removePrefix(protocol)
+            if (rest.isBlank()) return false
+            // Reject dangerous/special characters to prevent injection
+            val dangerous = setOf(';', '|', '`', '$', '>', '<', '\n', '\r', '\t', '\'', '"')
+            if (rest.any { it in dangerous }) return false
+            if (rest.contains("..")) return false
+            // Unix socket paths need only be non-empty
+            if (protocol == "unix://") return true
+            // Network protocols require host:port
+            val portSeparator = rest.lastIndexOf(':')
+            if (portSeparator <= 0) return false
+            val portStr = rest.substring(portSeparator + 1).substringBefore('/')
+            val port = portStr.toIntOrNull() ?: return false
+            return port in 1..65535
+        }
+
         /**
          * Parse from JSON
          */

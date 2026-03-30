@@ -134,37 +134,55 @@ class OnboardingActivity : BaseActivity(), OnRestoreCompletedListener {
             is OnboardingPeersFragment -> {
                 val selectedPeers = currentFragment.getSelectedPeers()
                 val useDefault = currentFragment.isUsingDefaultPeers()
+                val manualPeerUrl = currentFragment.getManualPeerUrl()
 
-                when {
-                    selectedPeers.isEmpty() && !useDefault -> {
-                        Toast.makeText(this, R.string.error_no_peers_selected, Toast.LENGTH_SHORT).show()
-                        false
-                    }
-                    else -> {
-                        if (selectedPeers.isNotEmpty()) {
-                            // User selected custom peers - save them and disable defaults
-                            // (savePeer() automatically sets useDefaultPeers to false)
-                            selectedPeers.sortedBy { it.rtt }.forEach { peer ->
-                                configRepository.savePeer(peer.toPeerInfo())
-                            }
-                        } else {
-                            // User chose to use default peers - save them as PeerInfo with DEFAULT tag
-                            // This will preserve the useDefaultPeers flag since savePeer checks the tag
-                            com.jbselfcompany.tyr.data.ConfigRepository.DEFAULT_PEERS.forEach { peerUri ->
-                                val defaultPeer = com.jbselfcompany.tyr.data.PeerInfo(
-                                    uri = peerUri,
-                                    isEnabled = true,
-                                    tag = com.jbselfcompany.tyr.data.PeerInfo.PeerTag.DEFAULT
-                                )
-                                configRepository.savePeer(defaultPeer)
-                            }
-                            // Explicitly set the flag to true after saving default peers
-                            configRepository.setUseDefaultPeers(true)
-                        }
+                // Nothing selected at all
+                if (selectedPeers.isEmpty() && !useDefault && manualPeerUrl.isNullOrBlank()) {
+                    Toast.makeText(this, R.string.error_no_peers_selected, Toast.LENGTH_SHORT).show()
+                    return false
+                }
 
-                        true
+                // Validate manually entered peer URL using shared validator
+                if (!manualPeerUrl.isNullOrBlank()) {
+                    if (!com.jbselfcompany.tyr.data.PeerInfo.isValidPeerUrl(manualPeerUrl)) {
+                        Toast.makeText(this, R.string.error_invalid_peer_url, Toast.LENGTH_SHORT).show()
+                        return false
                     }
                 }
+
+                // Save discovered/selected peers
+                if (selectedPeers.isNotEmpty()) {
+                    selectedPeers.sortedBy { it.rtt }.forEach { peer ->
+                        configRepository.savePeer(peer.toPeerInfo())
+                    }
+                }
+
+                // Save manually entered peer
+                if (!manualPeerUrl.isNullOrBlank()) {
+                    configRepository.savePeer(
+                        com.jbselfcompany.tyr.data.PeerInfo(
+                            uri = manualPeerUrl,
+                            isEnabled = true,
+                            tag = com.jbselfcompany.tyr.data.PeerInfo.PeerTag.CUSTOM
+                        )
+                    )
+                }
+
+                // Use default peers if no custom selection was made
+                if (selectedPeers.isEmpty() && manualPeerUrl.isNullOrBlank()) {
+                    com.jbselfcompany.tyr.data.ConfigRepository.DEFAULT_PEERS.forEach { peerUri ->
+                        configRepository.savePeer(
+                            com.jbselfcompany.tyr.data.PeerInfo(
+                                uri = peerUri,
+                                isEnabled = true,
+                                tag = com.jbselfcompany.tyr.data.PeerInfo.PeerTag.DEFAULT
+                            )
+                        )
+                    }
+                    configRepository.setUseDefaultPeers(true)
+                }
+
+                true
             }
             else -> true
         }

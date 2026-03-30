@@ -351,4 +351,17 @@
     <!-- Service Errors -->
     <string name="error_service_not_running">Service is not running</string>
     <string name="error_service_not_available">Service is not available</string>
+
+    <!-- Deeplink peer addition (tyr://open?peer=...) -->
+    <string name="deeplink_add_peer_title">Add Peer</string>
+    <string name="deeplink_add_peer_message">Add this peer to Tyr?\n\n%s</string>
+    <string name="deeplink_peer_added">Peer added</string>
+    <string name="deeplink_peer_already_exists">This peer is already configured</string>
+    <string name="deeplink_invalid_peer">Invalid peer address</string>
+
+    <!-- Manual peer entry in onboarding -->
+    <string name="manual_peer_title">Or enter peer manually</string>
+    <string name="manual_peer_description">For local or private peers (e.g. local hotspot node)</string>
+    <string name="manual_peer_hint">quic://192.168.x.x:port</string>
+    <string name="error_invalid_peer_url">Invalid peer URL. Use tcp://, tls://, or quic:// format</string>
 </resources>

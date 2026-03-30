@@ -352,4 +352,17 @@
     <!-- Service Errors -->
     <string name="error_service_not_running">Сервис не запущен</string>
     <string name="error_service_not_available">Сервис недоступен</string>
+
+    <!-- Deeplink peer addition (tyr://open?peer=...) -->
+    <string name="deeplink_add_peer_title">Добавить пир</string>
+    <string name="deeplink_add_peer_message">Добавить этот пир в Tyr?\n\n%s</string>
+    <string name="deeplink_peer_added">Пир добавлен</string>
+    <string name="deeplink_peer_already_exists">Этот пир уже настроен</string>
+    <string name="deeplink_invalid_peer">Неверный адрес пира</string>
+
+    <!-- Manual peer entry in onboarding -->
+    <string name="manual_peer_title">Или введите пир вручную</string>
+    <string name="manual_peer_description">Для локальных или частных пиров (например, локальная точка доступа)</string>
+    <string name="manual_peer_hint">quic://192.168.x.x:порт</string>
+    <string name="error_invalid_peer_url">Неверный URL пира. Используйте формат tcp://, tls:// или quic://</string>
 </resources>

@@ -27,6 +27,7 @@ import com.jbselfcompany.tyr.ui.onboarding.OnboardingActivity
 import com.jbselfcompany.tyr.ui.settings.SettingsActivity
 import com.jbselfcompany.tyr.utils.AutoconfigServer
 import com.jbselfcompany.tyr.utils.NetworkStatsMonitor
+import com.jbselfcompany.tyr.data.PeerInfo
 import com.jbselfcompany.tyr.utils.PermissionManager
 import android.util.Log
 import android.graphics.Bitmap
@@ -90,8 +91,17 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         setupUI()
         bindService()
 
+        // Handle deeplink if launched via tyr://open?peer=...
+        handleDeeplinkIntent(intent)
+
         // Don't request permissions automatically on first launch
         // They will be shown as Snackbars in onResume() instead
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeeplinkIntent(intent)
     }
 
     override fun onResume() {
@@ -714,6 +724,49 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                 binding.peersContainer.addView(peerView)
             }
         }
+    }
+
+    /**
+     * Handle tyr://open?peer=<url> deeplink.
+     * Shows a confirmation dialog before adding the peer.
+     * ConfigRepository is SharedPreferences-backed and does not depend on service binding.
+     */
+    private fun handleDeeplinkIntent(intent: Intent?) {
+        if (!configRepository.isOnboardingCompleted()) return
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val uri = intent.data ?: return
+        if (uri.scheme != "tyr" || uri.host != "open") return
+
+        // Clear intent data immediately to prevent replay on configuration change (e.g. rotation)
+        setIntent(intent.apply { data = null })
+
+        val peerUrl = uri.getQueryParameter("peer")?.trim() ?: return
+        if (peerUrl.isBlank()) return
+
+        // Validate full URL (protocol + host:port content) using shared validator
+        if (!PeerInfo.isValidPeerUrl(peerUrl)) {
+            Snackbar.make(binding.root, R.string.deeplink_invalid_peer, Snackbar.LENGTH_SHORT).show()
+            return
+        }
+
+        // Check if peer already exists
+        if (configRepository.getAllPeersInfo().any { it.uri == peerUrl }) {
+            Snackbar.make(binding.root, R.string.deeplink_peer_already_exists, Snackbar.LENGTH_SHORT).show()
+            return
+        }
+
+        // Show confirmation dialog before adding
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.deeplink_add_peer_title)
+            .setMessage(getString(R.string.deeplink_add_peer_message, peerUrl))
+            .setPositiveButton(R.string.add) { _, _ ->
+                configRepository.savePeer(
+                    PeerInfo(uri = peerUrl, isEnabled = true, tag = PeerInfo.PeerTag.CUSTOM)
+                )
+                Snackbar.make(binding.root, R.string.deeplink_peer_added, Snackbar.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /**
