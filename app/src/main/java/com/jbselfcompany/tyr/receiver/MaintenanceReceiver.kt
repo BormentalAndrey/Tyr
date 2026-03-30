@@ -1,5 +1,6 @@
 package com.jbselfcompany.tyr.receiver
 
+import android.content.ServiceConnection
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -8,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
+import com.jbselfcompany.tyr.data.PeerInfo
 import com.jbselfcompany.tyr.service.YggmailService
 
 /**
@@ -137,13 +139,54 @@ class MaintenanceReceiver : BroadcastReceiver() {
                 return
             }
 
-            // Lightweight maintenance tasks:
-            // 1. Verify service health (handled by service internally)
-            // 2. Trigger any pending queue checks (if needed)
-            // Note: The native yggmail library handles its own heartbeats,
-            // we just ensure the service stays responsive
+            // Bind to service and check peer connectivity
+            // Use a static reference via application context
+            val serviceIntent = Intent(context, YggmailService::class.java)
+            val connection = object : ServiceConnection {
+                override fun onServiceConnected(name: android.content.ComponentName?, binder: android.os.IBinder?) {
+                    try {
+                        val service = (binder as? YggmailService.LocalBinder)?.getService()
+                        if (service == null) {
+                            Log.w(TAG, "Could not get service reference")
+                            return
+                        }
 
-            Log.d(TAG, "Maintenance completed successfully")
+                        // Check peer connections
+                        val connections = service.getPeerConnections()
+                        val hasConnectedPeer = connections?.any { it.up } == true
+
+                        if (!hasConnectedPeer) {
+                            Log.w(TAG, "No connected peers detected - triggering reconnection")
+                            // Hot reload peers to trigger reconnection via Yggdrasil core
+                            service.hotReloadPeers()
+                            Log.i(TAG, "Peer reconnection triggered")
+                        } else {
+                            Log.d(TAG, "Peers OK: ${connections?.count { it.up }} connected")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error during peer connectivity check", e)
+                    } finally {
+                        try { context.unbindService(this) } catch (_: Exception) {}
+                    }
+                }
+
+                override fun onServiceDisconnected(name: android.content.ComponentName?) {}
+            }
+
+            try {
+                val bound = context.bindService(
+                    serviceIntent,
+                    connection,
+                    Context.BIND_AUTO_CREATE
+                )
+                if (!bound) {
+                    Log.w(TAG, "Could not bind to service for maintenance")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error binding to service", e)
+            }
+
+            Log.d(TAG, "Maintenance peer check initiated")
 
         } catch (e: Exception) {
             Log.e(TAG, "Error during maintenance", e)

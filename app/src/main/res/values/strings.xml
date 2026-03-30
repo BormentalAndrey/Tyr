@@ -337,6 +337,17 @@
     <string name="storage_file_size">Files (large messages): %.2f MB</string>
     <string name="storage_total_size">Total: %.2f MB</string>
 
+    <!-- Outbound Queue -->
+    <string name="clear_outbound_queue">Clear Outbound Queue</string>
+    <string name="clear_outbound_queue_description">Remove stuck messages from the outbound send queue</string>
+    <string name="loading_queue_info">Loading queue info…</string>
+    <string name="error_loading_queue_info">Failed to load queue info</string>
+    <string name="outbound_queue_empty">Outbound queue is empty — no stuck messages.</string>
+    <string name="outbound_queue_clear_confirmation">There are %d message(s) stuck in the outbound queue. Clear them now?</string>
+    <string name="clearing_queue">Clearing outbound queue…</string>
+    <string name="error_clearing_queue">Failed to clear outbound queue</string>
+    <string name="queue_cleared">Cleared %d message(s) from the outbound queue</string>
+
     <!-- Service Errors -->
     <string name="error_service_not_running">Service is not running</string>
     <string name="error_service_not_available">Service is not available</string>

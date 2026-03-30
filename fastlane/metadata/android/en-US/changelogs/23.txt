@@ -1,0 +1,6 @@
+• Fixed peer disconnection when app is minimized (Doze Mode compatibility)
+• QUIC idle timeout increased to 30 minutes to survive Android Doze windows
+• Runtime QUIC keep-alive update: reduces network activity when in background (60s) vs foreground (5s)
+• Automatic peer reconnection during periodic maintenance checks
+• Outbound queue management: view and clear stuck messages from Settings → Storage
+• Undeliverable timeout reduced from 7 days to 24 hours for faster queue cleanup

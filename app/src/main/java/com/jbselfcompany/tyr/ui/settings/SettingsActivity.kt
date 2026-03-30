@@ -50,6 +50,7 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
         private const val ID_BACKUP_RESTORE = 9
         private const val ID_HEADER_STORAGE = 19
         private const val ID_UNREAD_QUOTA = 20
+        private const val ID_CLEAR_OUTBOUND_QUEUE = 21
         private const val ID_HEADER_APPEARANCE = 10
         private const val ID_LANGUAGE = 11
         private const val ID_THEME = 12
@@ -180,6 +181,14 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
                 type = SettingsAdapter.ItemType.PLAIN
             )
         )
+        settingsItems.add(
+            SettingsAdapter.Item(
+                id = ID_CLEAR_OUTBOUND_QUEUE,
+                titleRes = R.string.clear_outbound_queue,
+                descriptionRes = R.string.clear_outbound_queue_description,
+                type = SettingsAdapter.ItemType.PLAIN
+            )
+        )
 
         // Appearance Settings Section
         settingsItems.add(
@@ -283,6 +292,7 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
             ID_REGENERATE_KEYS -> showRegenerateKeysDialog()
             ID_BACKUP_RESTORE -> showBackupRestoreOptions()
             ID_UNREAD_QUOTA -> showUnreadQuotaDialog()
+            ID_CLEAR_OUTBOUND_QUEUE -> showClearOutboundQueueDialog()
             ID_LANGUAGE -> showLanguageDialog()
             ID_THEME -> showThemeDialog()
             ID_COLLECT_LOGS -> startActivity(Intent(this, LogsActivity::class.java))
@@ -829,6 +839,78 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
                     ).show()
                 } else {
                     Toast.makeText(this, R.string.error_saving_quota, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun showClearOutboundQueueDialog() {
+        if (!YggmailService.isRunning) {
+            Toast.makeText(this, R.string.error_service_not_running, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val binder = TyrApplication.instance.yggmailServiceBinder
+        val service = binder?.getService()
+
+        if (service == null) {
+            Toast.makeText(this, R.string.error_service_not_available, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        showLoadingOverlay(true, getString(R.string.loading_queue_info))
+
+        Thread {
+            val count = service.getOutboundQueueCount()
+
+            runOnUiThread {
+                showLoadingOverlay(false)
+
+                if (count < 0) {
+                    Toast.makeText(this, R.string.error_loading_queue_info, Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+
+                val message = if (count == 0) {
+                    getString(R.string.outbound_queue_empty)
+                } else {
+                    getString(R.string.outbound_queue_clear_confirmation, count)
+                }
+
+                val builder = MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.clear_outbound_queue)
+                    .setMessage(message)
+
+                if (count > 0) {
+                    builder
+                        .setPositiveButton(R.string.ok) { _, _ -> clearOutboundQueue(service) }
+                        .setNegativeButton(R.string.cancel, null)
+                } else {
+                    builder.setPositiveButton(R.string.ok, null)
+                }
+
+                builder.show()
+            }
+        }.start()
+    }
+
+    private fun clearOutboundQueue(service: YggmailService) {
+        showLoadingOverlay(true, getString(R.string.clearing_queue))
+
+        Thread {
+            val cleared = service.clearOutboundQueue()
+
+            runOnUiThread {
+                showLoadingOverlay(false)
+
+                if (cleared < 0) {
+                    Toast.makeText(this, R.string.error_clearing_queue, Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(
+                        this,
+                        getString(R.string.queue_cleared, cleared),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }.start()

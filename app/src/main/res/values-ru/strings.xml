@@ -338,6 +338,17 @@
     <string name="storage_file_size">Файлы (большие сообщения): %.2f МБ</string>
     <string name="storage_total_size">Всего: %.2f МБ</string>
 
+    <!-- Outbound Queue -->
+    <string name="clear_outbound_queue">Очистить очередь отправки</string>
+    <string name="clear_outbound_queue_description">Удалить зависшие сообщения из очереди исходящих</string>
+    <string name="loading_queue_info">Загрузка информации об очереди…</string>
+    <string name="error_loading_queue_info">Не удалось загрузить информацию об очереди</string>
+    <string name="outbound_queue_empty">Очередь отправки пуста — зависших сообщений нет.</string>
+    <string name="outbound_queue_clear_confirmation">В очереди отправки %d зависших сообщений. Удалить их?</string>
+    <string name="clearing_queue">Очистка очереди отправки…</string>
+    <string name="error_clearing_queue">Не удалось очистить очередь отправки</string>
+    <string name="queue_cleared">Удалено %d сообщений из очереди отправки</string>
+
     <!-- Service Errors -->
     <string name="error_service_not_running">Сервис не запущен</string>
     <string name="error_service_not_available">Сервис недоступен</string>

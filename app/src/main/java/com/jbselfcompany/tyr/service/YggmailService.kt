@@ -1329,6 +1329,56 @@ class YggmailService : Service(), LogCallback {
         return result
     }
 
+    /**
+     * Get count of messages in the outbound send queue.
+     * Returns -1 if service is unavailable.
+     */
+    fun getOutboundQueueCount(): Int {
+        val latch = CountDownLatch(1)
+        var result = -1
+
+        serviceHandler.post {
+            try {
+                result = yggmailService?.outboundQueueCount?.toInt() ?: -1
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting outbound queue count", e)
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout getting outbound queue count")
+            return -1
+        }
+        return result
+    }
+
+    /**
+     * Clear all entries from the outbound send queue.
+     * Returns the number of entries removed, or -1 on error.
+     */
+    fun clearOutboundQueue(): Int {
+        val latch = CountDownLatch(1)
+        var result = -1
+
+        serviceHandler.post {
+            try {
+                result = yggmailService?.clearOutboundQueue()?.toInt() ?: -1
+            } catch (e: Exception) {
+                Log.e(TAG, "Error clearing outbound queue", e)
+            } finally {
+                latch.countDown()
+            }
+        }
+
+        if (!latch.await(10, TimeUnit.SECONDS)) {
+            Log.e(TAG, "Timeout clearing outbound queue")
+            return -1
+        }
+        return result
+    }
+
 }
 
 /**

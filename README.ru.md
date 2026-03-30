@@ -4,10 +4,12 @@
 
 ### Настоящая P2P электронная почта поверх сети Yggdrasil
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Лицензия](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-6.0%2B-green.svg)](https://www.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-purple.svg)](https://kotlinlang.org)
-![Version](https://img.shields.io/f-droid/v/com.jbselfcompany.tyr?baseUrl=https://apt.izzysoft.de/fdroid&label=IzzyOnDroid)
+![Версия](https://img.shields.io/f-droid/v/com.jbselfcompany.tyr?baseUrl=https://apt.izzysoft.de/fdroid&label=IzzyOnDroid)
+![Загрузки](https://img.shields.io/github/downloads/JB-SelfCompany/Tyr/total)
+[![Посетители](https://visitor-badge.laobi.icu/badge?page_id=JB-SelfCompany.Tyr)](https://github.com/JB-SelfCompany/Tyr)
 
 [<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroidButtonGreyBorder_nofont.png" height="80" alt="Get it at IzzyOnDroid">](https://apt.izzysoft.de/packages/com.jbselfcompany.tyr)
 
@@ -232,8 +234,6 @@ Tyr - программное обеспечение с открытым исхо
 
 <div align="center">
 
-**Сделано с ❤️ для децентрализованного интернета**
-
-[Сообщить об ошибке](https://github.com/JB-SelfCompany/Tyr/issues) · [Запросить функцию](https://github.com/JB-SelfCompany/Tyr/issues)
+Made with ❤️ by <a href="https://github.com/JB-SelfCompany">JB-SelfCompany</a>
 
 </div>
