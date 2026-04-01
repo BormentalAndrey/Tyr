@@ -37,41 +37,54 @@ object PeerDiscoveryHelper {
         pauseMs: Int = 200
     ) {
         Thread {
+            var tempService: mobile.YggmailService? = null
             try {
-                // Create a temporary YggmailService instance just for peer discovery
-                // We use a temporary in-memory database path that doesn't need to exist
                 val tempDbPath = File(context.cacheDir, "temp_peer_discovery.db").absolutePath
                 val tempSmtpAddr = "127.0.0.1:0"  // Port 0 = don't bind
                 val tempImapAddr = "127.0.0.1:0"  // Port 0 = don't bind
 
-                val tempService = mobile.Mobile.newYggmailService(
-                    tempDbPath,
-                    tempSmtpAddr,
-                    tempImapAddr
-                )
+                tempService = mobile.Mobile.newYggmailService(tempDbPath, tempSmtpAddr, tempImapAddr)
 
                 if (tempService == null) {
                     Log.e(TAG, "Failed to create temporary service for peer discovery")
+                    Handler(Looper.getMainLooper()).post { callback.onProgress(0, 0, 0) }
                     return@Thread
                 }
 
-                // Set batching parameters
                 tempService.setPeerBatchingParams(batchSize.toLong(), concurrency.toLong(), pauseMs.toLong())
 
-                // Start peer discovery (doesn't require Initialize() or Start())
-                tempService.findAvailablePeersAsync(protocols, region, maxRTTMs.toLong(), callback)
+                // Capture as val so the lambda can reference it safely
+                val svc = tempService
 
+                // Wrap callback to release native resources when discovery completes
+                val wrappedCallback = object : PeerDiscoveryCallback {
+                    override fun onProgress(current: Long, total: Long, availableCount: Long) {
+                        callback.onProgress(current, total, availableCount)
+                        if (total > 0 && current >= total) {
+                            closeTempService(svc)
+                        }
+                    }
+                    override fun onPeerAvailable(peerJSON: String) {
+                        callback.onPeerAvailable(peerJSON)
+                    }
+                }
+
+                tempService.findAvailablePeersAsync(protocols, region, maxRTTMs.toLong(), wrappedCallback)
                 Log.d(TAG, "Peer discovery started: protocols=$protocols, region=$region, maxRTT=${maxRTTMs}ms")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error starting peer discovery", e)
-
-                // Notify callback about error
-                Handler(Looper.getMainLooper()).post {
-                    // Signal completion with 0 results
-                    callback.onProgress(0, 0, 0)
-                }
+                closeTempService(tempService)
+                Handler(Looper.getMainLooper()).post { callback.onProgress(0, 0, 0) }
             }
-        }.start()
+        }.apply { name = "PeerDiscovery" }.start()
+    }
+
+    private fun closeTempService(service: mobile.YggmailService?) {
+        if (service == null) return
+        Thread {
+            try { service.stop() } catch (e: Exception) { Log.w(TAG, "Error stopping temp service", e) }
+            try { service.close() } catch (e: Exception) { Log.w(TAG, "Error closing temp service", e) }
+        }.apply { name = "PeerDiscovery-Close"; start() }
     }
 }

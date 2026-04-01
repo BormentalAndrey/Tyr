@@ -1,11 +1,11 @@
 package com.jbselfcompany.tyr.receiver
 
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -21,10 +21,10 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
 
     companion object {
         private const val TAG = "NetworkChangeReceiver"
-        private const val DEBOUNCE_DELAY_MS = 1000L // 1 second debounce
+        private const val RECONNECT_DELAY_MS = 2000L // 2 seconds to let network stabilize
+        private const val LOST_CHECK_DELAY_MS = 1000L
     }
 
-    private var lastNetworkChangeTime = 0L
     private val handler = Handler(Looper.getMainLooper())
     private var pendingNetworkAvailableCheck: Runnable? = null
     private var pendingNetworkLostCheck: Runnable? = null
@@ -33,51 +33,41 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
         super.onAvailable(network)
         Log.d(TAG, "Network available: $network")
 
-        // Cancel any pending check
+        // Cancel both pending checks — a new network arrived, no need to handle prior loss
         pendingNetworkAvailableCheck?.let { handler.removeCallbacks(it) }
+        pendingNetworkLostCheck?.let { handler.removeCallbacks(it) }
 
-        // Debounce: prevent multiple rapid calls
-        val now = System.currentTimeMillis()
-        if (now - lastNetworkChangeTime < DEBOUNCE_DELAY_MS) {
-            Log.d(TAG, "Network change ignored (debounce)")
-            return
-        }
-        lastNetworkChangeTime = now
-
-        // Schedule check using Handler instead of Thread
+        // Delay to let the network fully establish before reconnecting peers
         pendingNetworkAvailableCheck = Runnable {
             if (YggmailService.isRunning) {
-                Log.i(TAG, "Network became available - Yggdrasil will auto-reconnect")
-                // Note: Yggdrasil core handles peer reconnection automatically
-                // We don't need to manually restart transport (prevents ErrClosed errors)
+                Log.i(TAG, "Network available — triggering peer reconnection")
+                try {
+                    val intent = Intent(context, YggmailService::class.java).apply {
+                        action = YggmailService.ACTION_RECONNECT_PEERS
+                    }
+                    context.startService(intent)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to trigger peer reconnection", e)
+                }
             }
         }
-        handler.postDelayed(pendingNetworkAvailableCheck!!, DEBOUNCE_DELAY_MS)
+        handler.postDelayed(pendingNetworkAvailableCheck!!, RECONNECT_DELAY_MS)
     }
 
     override fun onLost(network: Network) {
         super.onLost(network)
         Log.d(TAG, "Network lost: $network")
 
-        // Cancel any pending check
+        // Cancel any pending lost check (debounce)
         pendingNetworkLostCheck?.let { handler.removeCallbacks(it) }
 
-        // Debounce: prevent multiple rapid calls
-        val now = System.currentTimeMillis()
-        if (now - lastNetworkChangeTime < DEBOUNCE_DELAY_MS) {
-            Log.d(TAG, "Network change ignored (debounce)")
-            return
-        }
-        lastNetworkChangeTime = now
-
-        // Schedule check using Handler instead of Thread
         pendingNetworkLostCheck = Runnable {
             if (!hasNetworkConnectivity(context)) {
                 Log.w(TAG, "All networks lost")
                 // Service will handle disconnection gracefully
             }
         }
-        handler.postDelayed(pendingNetworkLostCheck!!, DEBOUNCE_DELAY_MS)
+        handler.postDelayed(pendingNetworkLostCheck!!, LOST_CHECK_DELAY_MS)
     }
 
     override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
@@ -142,19 +132,12 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
      */
     private fun hasNetworkConnectivity(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork
-            val capabilities = connectivityManager.getNetworkCapabilities(network)
-            capabilities != null && (
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            val networkInfo = connectivityManager.activeNetworkInfo
-            networkInfo != null && networkInfo.isConnected
-        }
+        val network = connectivityManager.activeNetwork
+        val capabilities = connectivityManager.getNetworkCapabilities(network)
+        return capabilities != null && (
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        )
     }
 }

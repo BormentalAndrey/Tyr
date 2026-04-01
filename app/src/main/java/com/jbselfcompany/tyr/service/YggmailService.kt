@@ -45,20 +45,16 @@ class YggmailService : Service(), LogCallback {
         private const val TAG = "YggmailService"
         private const val NOTIFICATION_ID = 1001
 
-        // WakeLock constants for battery optimization
-        // Differentiate WakeLock usage by operation type
-        private const val WAKELOCK_SEND_TIMEOUT_MS = 60 * 1000L  // 1 minute for active sending
-        private const val WAKELOCK_IDLE_TIMEOUT_MS = 5 * 60 * 1000L  // 5 minutes for idle maintenance
-        private const val WAKELOCK_IDLE_THRESHOLD_MS = 2 * 60 * 1000L  // 2 minutes of inactivity
-        private const val WAKELOCK_GRACE_PERIOD_MS = 5 * 1000L  // 5-second grace period before release
-
         const val ACTION_START = "com.jbselfcompany.tyr.START"
         const val ACTION_STOP = "com.jbselfcompany.tyr.STOP"
         const val ACTION_SOFT_STOP = "com.jbselfcompany.tyr.SOFT_STOP"
+        const val ACTION_RECONNECT_PEERS = "com.jbselfcompany.tyr.RECONNECT_PEERS"
+        const val ACTION_MAINTENANCE_CHECK = "com.jbselfcompany.tyr.MAINTENANCE_CHECK"
 
         /**
          * Check if service is currently running
          */
+        @Volatile
         var isRunning = false
             private set
 
@@ -128,7 +124,7 @@ class YggmailService : Service(), LogCallback {
     // Service status
     private var serviceStatus = ServiceStatus.STOPPED
     private var lastError: String? = null
-    private val statusListeners = mutableListOf<ServiceStatusListener>()
+    private val statusListeners = java.util.concurrent.CopyOnWriteArrayList<ServiceStatusListener>()
 
     // Connection status tracking
     private var lastConnectionStatus: String? = null
@@ -267,6 +263,32 @@ class YggmailService : Service(), LogCallback {
                     // Call stopSelf on main thread after cleanup completes
                     mainHandler.post {
                         stopSelf()
+                    }
+                }
+            }
+            ACTION_RECONNECT_PEERS -> {
+                // Triggered by network change (WiFi <-> Mobile switch)
+                if (isRunning) {
+                    Log.i(TAG, "Network changed - reconnecting peers")
+                    hotReloadPeers()
+                }
+            }
+            ACTION_MAINTENANCE_CHECK -> {
+                // Triggered by MaintenanceReceiver — check peers and reconnect if needed
+                if (isRunning) {
+                    serviceHandler.post {
+                        try {
+                            val connections = getPeerConnections()
+                            val hasConnectedPeer = connections?.any { it.up } == true
+                            if (!hasConnectedPeer) {
+                                Log.w(TAG, "Maintenance: no connected peers — triggering reconnection")
+                                hotReloadPeers()
+                            } else {
+                                Log.d(TAG, "Maintenance: peers OK (${connections?.count { it.up }} connected)")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error during maintenance check", e)
+                        }
                     }
                 }
             }
@@ -494,7 +516,7 @@ class YggmailService : Service(), LogCallback {
         try {
             // Acquire WakeLock for shutdown process to prevent interruption
             // This is critical to ensure complete cleanup
-            acquireWakeLockForOperation("shutdown", 15_000)
+            acquireWakeLockForOperation("shutdown", 20_000)
 
             // Step 1: Stop the service (closes network connections)
             // Wrap in try-catch for ALL throwables (including native crashes/panics)
@@ -587,13 +609,7 @@ class YggmailService : Service(), LogCallback {
             // Step 3: Clear reference to native service
             yggmailService = null
 
-            // Step 4: Force garbage collection to help release Go resources
-            // This is important for gomobile-generated code
-            Log.d(TAG, "Requesting garbage collection...")
-            System.gc()
-            System.runFinalization()
-
-            // Step 5: Wait for ports to be fully released
+            // Step 4: Wait for ports to be fully released
             // TCP sockets may remain in TIME_WAIT state
             Log.d(TAG, "Waiting for port release...")
             Thread.sleep(1000)
