@@ -1,2 +1,3 @@
 • Fixed: peers list stays empty after switching between WiFi and mobile data — reconnection now triggers automatically
+• Fixed: peers disconnect when app is minimized to background — connections now stay alive
 • Fixed: native Go/SQLite resource leak in peer discovery (temp service was never closed)

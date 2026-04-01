@@ -118,8 +118,9 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
 
     override fun onPause() {
         super.onPause()
-        // Notify service that app went to background
-        yggmailService?.setAppActive(false)
+        // Do NOT call setAppActive(false) here — it switches QUIC keep-alive to 60s
+        // which causes peer connections to time out while the app is in background.
+        // Active state is managed by the Doze Mode receiver in YggmailService.
         // Stop network monitoring to save battery
         stopNetworkMonitoring()
     }
