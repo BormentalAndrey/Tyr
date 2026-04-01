@@ -33,6 +33,17 @@ class ConfigRepository(private val context: Context) {
         private const val KEY_CACHED_DISCOVERED_PEERS = "cached_discovered_peers"
         private const val KEY_CACHE_TIMESTAMP = "cache_timestamp"
 
+        // Update check settings
+        private const val KEY_UPDATE_CHECK_ENABLED = "update_check_enabled"
+        private const val KEY_UPDATE_CHECK_INTERVAL_HOURS = "update_check_interval_hours"
+        private const val KEY_LAST_UPDATE_CHECK_TIME = "last_update_check_time"
+        private const val KEY_DISMISSED_UPDATE_VERSION = "dismissed_update_version"
+
+        // Update check interval options
+        const val UPDATE_INTERVAL_ON_START = 0
+        const val UPDATE_INTERVAL_DAILY = 24
+        const val UPDATE_INTERVAL_WEEKLY = 168
+
         // Cache TTL for discovered peers (24 hours)
         private const val CACHE_TTL_HOURS = 24
 
@@ -529,5 +540,51 @@ class ConfigRepository(private val context: Context) {
             remove(KEY_CACHE_TIMESTAMP)
         }
         Log.d(TAG, "Cleared discovered peers cache")
+    }
+
+    // ============================================
+    // Update Check Settings
+    // ============================================
+
+    fun isUpdateCheckEnabled(): Boolean =
+        prefs.getBoolean(KEY_UPDATE_CHECK_ENABLED, true)
+
+    fun setUpdateCheckEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_UPDATE_CHECK_ENABLED, enabled) }
+    }
+
+    /** Returns interval in hours: 0 = on every app start, 24 = daily, 168 = weekly */
+    fun getUpdateCheckIntervalHours(): Int =
+        prefs.getInt(KEY_UPDATE_CHECK_INTERVAL_HOURS, UPDATE_INTERVAL_DAILY)
+
+    fun setUpdateCheckIntervalHours(hours: Int) {
+        prefs.edit { putInt(KEY_UPDATE_CHECK_INTERVAL_HOURS, hours) }
+    }
+
+    fun getLastUpdateCheckTime(): Long =
+        prefs.getLong(KEY_LAST_UPDATE_CHECK_TIME, 0L)
+
+    fun setLastUpdateCheckTime(time: Long) {
+        prefs.edit { putLong(KEY_LAST_UPDATE_CHECK_TIME, time) }
+    }
+
+    fun getDismissedUpdateVersion(): String? =
+        prefs.getString(KEY_DISMISSED_UPDATE_VERSION, null)
+
+    fun setDismissedUpdateVersion(version: String) {
+        prefs.edit { putString(KEY_DISMISSED_UPDATE_VERSION, version) }
+    }
+
+    /**
+     * Returns true if an update check should be performed now,
+     * based on enabled flag and the configured interval.
+     */
+    fun shouldCheckForUpdates(): Boolean {
+        if (!isUpdateCheckEnabled()) return false
+        val lastCheck = getLastUpdateCheckTime()
+        if (lastCheck == 0L) return true
+        val intervalMs = getUpdateCheckIntervalHours() * 60L * 60_000L
+        if (intervalMs == 0L) return true // always check on start
+        return System.currentTimeMillis() - lastCheck > intervalMs
     }
 }

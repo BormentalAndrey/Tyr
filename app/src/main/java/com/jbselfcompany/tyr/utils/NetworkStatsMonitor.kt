@@ -20,6 +20,9 @@ class NetworkStatsMonitor(private val context: Context) {
     companion object {
         private const val TAG = "NetworkStatsMonitor"
         private const val UPDATE_INTERVAL_MS = 10000L // Update every 10 seconds (battery optimization)
+        // Delay for a follow-up poll after monitoring starts, to catch peers that
+        // finish reconnecting after a QUIC config change (Doze exit / active state change).
+        private const val RECONNECT_CATCHUP_DELAY_MS = 3000L
     }
 
     interface NetworkStatsListener {
@@ -65,10 +68,17 @@ class NetworkStatsMonitor(private val context: Context) {
      */
     fun start(listener: NetworkStatsListener, enableLatencyMeasurement: Boolean = true) {
         if (isMonitoring) {
-            // Already monitoring - just update the listener
+            // Already monitoring - update the listener and trigger immediate refresh
             Log.d(TAG, "Already monitoring, updating listener")
             this.listener = listener
             this.measureLatency = enableLatencyMeasurement
+            backgroundHandler?.post { updateStats() }
+            // Also schedule a follow-up to catch peers still reconnecting
+            handler.postDelayed({
+                if (isMonitoring) {
+                    backgroundHandler?.post { updateStats() }
+                }
+            }, RECONNECT_CATCHUP_DELAY_MS)
             return
         }
 
@@ -82,8 +92,16 @@ class NetworkStatsMonitor(private val context: Context) {
         this.measureLatency = enableLatencyMeasurement
         isMonitoring = true
 
-        // Start periodic updates
+        // Start periodic updates (fires immediately)
         handler.post(updateRunnable)
+
+        // Schedule a follow-up update to catch peers that finish reconnecting
+        // after a QUIC config change (Doze exit / active state transition).
+        handler.postDelayed({
+            if (isMonitoring) {
+                backgroundHandler?.post { updateStats() }
+            }
+        }, RECONNECT_CATCHUP_DELAY_MS)
 
         Log.d(TAG, "Network monitoring started")
     }

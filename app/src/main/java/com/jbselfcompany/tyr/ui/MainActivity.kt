@@ -27,6 +27,7 @@ import com.jbselfcompany.tyr.ui.onboarding.OnboardingActivity
 import com.jbselfcompany.tyr.ui.settings.SettingsActivity
 import com.jbselfcompany.tyr.utils.AutoconfigServer
 import com.jbselfcompany.tyr.utils.NetworkStatsMonitor
+import com.jbselfcompany.tyr.utils.UpdateChecker
 import com.jbselfcompany.tyr.data.PeerInfo
 import com.jbselfcompany.tyr.utils.PermissionManager
 import android.util.Log
@@ -49,6 +50,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
 
     private var yggmailService: YggmailService? = null
     private var serviceBound = false
+    private var updateCheckDoneThisSession = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -114,6 +116,11 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         startNetworkMonitoring()
         // Update storage info
         updateStorageInfo()
+        // Check for updates (once per session, background thread)
+        if (!updateCheckDoneThisSession) {
+            updateCheckDoneThisSession = true
+            checkForUpdatesInBackground()
+        }
     }
 
     override fun onPause() {
@@ -775,6 +782,55 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      */
     private fun Int.dpToPx(): Int {
         return (this * resources.displayMetrics.density).toInt()
+    }
+
+    /**
+     * Check for updates in background — only if conditions are met.
+     * Shows a dialog if a newer version is found and user hasn't dismissed it.
+     */
+    private fun checkForUpdatesInBackground() {
+        if (!configRepository.shouldCheckForUpdates()) return
+
+        Thread {
+            val info = UpdateChecker(this).checkForUpdates()
+            configRepository.setLastUpdateCheckTime(System.currentTimeMillis())
+
+            if (info == null || !info.hasUpdate) return@Thread
+
+            // Don't show if user already dismissed this version
+            if (info.latestVersion == configRepository.getDismissedUpdateVersion()) return@Thread
+
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    showUpdateDialog(info)
+                }
+            }
+        }.start()
+    }
+
+    private fun showUpdateDialog(info: UpdateChecker.UpdateInfo) {
+        val message = if (info.isFdroidInstall) {
+            getString(R.string.update_available_fdroid, info.latestVersion, info.currentVersion)
+        } else {
+            getString(R.string.update_available_github, info.latestVersion, info.currentVersion)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.update_available_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.update_download) { _, _ ->
+                startActivity(
+                    android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        Uri.parse(info.releaseUrl)
+                    )
+                )
+            }
+            .setNeutralButton(R.string.update_skip_version) { _, _ ->
+                configRepository.setDismissedUpdateVersion(info.latestVersion)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /**

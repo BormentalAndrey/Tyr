@@ -155,6 +155,14 @@ class YggmailService : Service(), LogCallback {
                     if (wasDozing != isDozing) {
                         Log.d(TAG, "[Battery] Doze mode changed: $isDozing")
                         updateNativeServicePowerState()
+                        // When exiting Doze with app active, QUIC connections were closed
+                        // during Doze (60s keepAlive → 5s keepAlive transition). Force
+                        // immediate peer reconnection instead of waiting for yggdrasil's
+                        // internal reconnect backoff timer.
+                        if (!isDozing && isAppActive) {
+                            Log.d(TAG, "[Reconnect] Exiting Doze, forcing immediate peer reconnection")
+                            hotReloadPeers()
+                        }
                     }
                 }
             }
@@ -1048,11 +1056,21 @@ class YggmailService : Service(), LogCallback {
      */
     fun setAppActive(active: Boolean) {
         try {
+            val wasEffectivelyActive = isAppActive && !isDozing
             isAppActive = active
             Log.d(TAG, "[Battery] App activity state changed to: $active")
 
             // Update native service with new power state
             updateNativeServicePowerState()
+
+            // When becoming effectively active (e.g. app opened after Doze exit),
+            // QUIC keepAlive changed (60s→5s), closing existing connections.
+            // Force immediate peer reconnection instead of waiting for internal backoff.
+            val isNowEffectivelyActive = isAppActive && !isDozing
+            if (isNowEffectivelyActive && !wasEffectivelyActive) {
+                Log.d(TAG, "[Reconnect] Became active, forcing immediate peer reconnection")
+                hotReloadPeers()
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error setting app activity state", e)
