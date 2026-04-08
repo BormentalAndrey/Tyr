@@ -23,7 +23,7 @@
 
 | | | | |
 | --- | --- | --- | --- |
-| <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/01.png" width="220"> | <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/02.png" width="220"> | <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/04.png" width="220"> | <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/05.png" width="220"> |
+| <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/01.png" width="220"> | <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/02.png" width="220"> | <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/03.png" width="220"> | <img src="fastlane/metadata/android/ru-RU/images/phoneScreenshots/05.png" width="220"> |
 
 </div>
 

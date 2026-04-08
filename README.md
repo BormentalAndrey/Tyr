@@ -25,7 +25,7 @@ True Peer-to-Peer Email on Yggdrasil Network
 
 | | | | |
 | --- | --- | --- | --- |
-| <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01.png" width="220"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02.png" width="220"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/04.png" width="220"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05.png" width="220"> |
+| <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/01.png" width="220"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/02.png" width="220"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/03.png" width="220"> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/05.png" width="220"> |
 
 </div>
 
