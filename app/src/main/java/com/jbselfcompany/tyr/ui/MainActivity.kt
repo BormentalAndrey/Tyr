@@ -1,17 +1,17 @@
 package com.jbselfcompany.tyr.ui
 
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
@@ -24,24 +24,36 @@ import com.jbselfcompany.tyr.service.ServiceStatus
 import com.jbselfcompany.tyr.service.ServiceStatusListener
 import com.jbselfcompany.tyr.service.YggmailService
 import com.jbselfcompany.tyr.ui.onboarding.OnboardingActivity
-import com.jbselfcompany.tyr.ui.settings.SettingsActivity
+import com.jbselfcompany.tyr.chat.ui.ChatFragment
+import com.jbselfcompany.tyr.ui.settings.SettingsFragment
 import com.jbselfcompany.tyr.utils.AutoconfigServer
 import com.jbselfcompany.tyr.utils.NetworkStatsMonitor
 import com.jbselfcompany.tyr.utils.UpdateChecker
 import com.jbselfcompany.tyr.data.PeerInfo
 import com.jbselfcompany.tyr.utils.PermissionManager
-import android.util.Log
+import com.jbselfcompany.tyr.chat.data.ChatRepository
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.widget.ImageView
+import androidx.lifecycle.lifecycleScope
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import com.jbselfcompany.tyr.utils.SecurePreferences
+import com.jbselfcompany.tyr.utils.TyrLogger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Main activity displaying service status and mail configuration.
  * Shows SMTP/IMAP connection information for DeltaChat.
  */
 class MainActivity : BaseActivity(), ServiceStatusListener {
+
+    companion object {
+        const val EXTRA_TAB = "extra_tab"
+        const val TAB_CHAT = "chat"
+    }
 
     private lateinit var binding: ActivityMainBinding
     private val configRepository by lazy { TyrApplication.instance.configRepository }
@@ -51,6 +63,21 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
     private var yggmailService: YggmailService? = null
     private var serviceBound = false
     private var updateCheckDoneThisSession = false
+
+    // Receives broadcast from YggmailService when new chat messages arrive
+    private val newChatReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == YggmailService.ACTION_NEW_CHAT_MESSAGES) {
+                updateChatBadge()
+                // Refresh the contact list so new messages appear immediately
+                // without waiting for ChatFragment's next 30-second poll.
+                val chatFrag = supportFragmentManager.findFragmentById(R.id.content_chat)
+                if (chatFrag is ChatFragment) {
+                    chatFrag.refreshContactList()
+                }
+            }
+        }
+    }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -65,6 +92,13 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
 
             // Update storage and quota info when service connects
             updateStorageInfo()
+
+            // BIND_AUTO_CREATE creates the service via onCreate() without calling onStartCommand().
+            // After a process kill + system restart, the service is bound but Yggmail is never
+            // initialized. Kick it with an explicit start if it should be running but isn't.
+            if (!YggmailService.isRunning && configRepository.isServiceEnabled()) {
+                YggmailService.start(this@MainActivity)
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -93,6 +127,11 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         setupUI()
         bindService()
 
+        // Handle tab selection from SettingsActivity navigation
+        if (intent.getStringExtra(EXTRA_TAB) == TAB_CHAT) {
+            binding.bottomNavigation.selectedItemId = R.id.nav_chat
+        }
+
         // Handle deeplink if launched via tyr://open?peer=...
         handleDeeplinkIntent(intent)
 
@@ -103,6 +142,10 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // Handle tab selection when resumed from SettingsActivity
+        if (intent.getStringExtra(EXTRA_TAB) == TAB_CHAT) {
+            binding.bottomNavigation.selectedItemId = R.id.nav_chat
+        }
         handleDeeplinkIntent(intent)
     }
 
@@ -116,10 +159,35 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         startNetworkMonitoring()
         // Update storage info
         updateStorageInfo()
+        // Update chat badge and listen for new messages
+        updateChatBadge()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                newChatReceiver,
+                IntentFilter(YggmailService.ACTION_NEW_CHAT_MESSAGES),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            registerReceiver(newChatReceiver, IntentFilter(YggmailService.ACTION_NEW_CHAT_MESSAGES))
+        }
         // Check for updates (once per session, background thread)
         if (!updateCheckDoneThisSession) {
             updateCheckDoneThisSession = true
             checkForUpdatesInBackground()
+        }
+        // Warn user if Keystore recovery deleted their password
+        checkKeystoreRecovery()
+    }
+
+    private fun checkKeystoreRecovery() {
+        val recoveryPrefs = getSharedPreferences(SecurePreferences.RECOVERY_FLAG_PREFS, Context.MODE_PRIVATE)
+        if (recoveryPrefs.getBoolean(SecurePreferences.RECOVERY_FLAG_KEY, false)) {
+            recoveryPrefs.edit().remove(SecurePreferences.RECOVERY_FLAG_KEY).apply()
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.keystore_recovery_title)
+                .setMessage(R.string.keystore_recovery_message)
+                .setPositiveButton(R.string.ok, null)
+                .show()
         }
     }
 
@@ -130,6 +198,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         // Active state is managed by the Doze Mode receiver in YggmailService.
         // Stop network monitoring to save battery
         stopNetworkMonitoring()
+        try { unregisterReceiver(newChatReceiver) } catch (_: Exception) {}
     }
 
     override fun onDestroy() {
@@ -189,6 +258,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             showEmailClientInstructionsDialog()
         }
 
+        setupBottomNavigation()
         updateUI()
     }
 
@@ -259,7 +329,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             // Generate DCLOGIN URL (simpler, doesn't require HTTPS)
             // DCLOGIN embeds credentials directly in the URI
             val dcloginUrl = autoconfigServer.generateDcloginUrl(email, password)
-            Log.d("MainActivity", "Generated DCLOGIN URL: $dcloginUrl")
+            TyrLogger.d("MainActivity", "DCLOGIN URL generated")
 
             // Check if DeltaChat/ArcaneChat is installed (try multiple package names)
             val deltaChatPackages = mapOf(
@@ -273,15 +343,13 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             val installedApps = deltaChatPackages.filter { (packageName, _) ->
                 try {
                     packageManager.getPackageInfo(packageName, 0)
-                    Log.d("MainActivity", "Found package: $packageName")
                     true
                 } catch (e: Exception) {
-                    Log.d("MainActivity", "Package not found: $packageName")
                     false
                 }
             }
 
-            Log.d("MainActivity", "Installed apps: ${installedApps.keys}")
+            TyrLogger.d("MainActivity", "Installed apps: ${installedApps.keys}")
 
             when {
                 installedApps.isEmpty() -> {
@@ -303,7 +371,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                 }
             }
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error setting up DeltaChat", e)
+            TyrLogger.e("MainActivity", "Error setting up DeltaChat", e)
             Snackbar.make(
                 binding.root,
                 R.string.dcaccount_error,
@@ -342,7 +410,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                 Snackbar.LENGTH_SHORT
             ).show()
         } catch (e: Exception) {
-            Log.w("MainActivity", "Failed to open with package $packageName, trying without", e)
+            TyrLogger.w("MainActivity", "Failed to open with package $packageName, trying without", e)
             // Try without package specification
             try {
                 val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -357,7 +425,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                     Snackbar.LENGTH_SHORT
                 ).show()
             } catch (e2: Exception) {
-                Log.e("MainActivity", "Failed to open DCLOGIN URL", e2)
+                TyrLogger.e("MainActivity", "Failed to open DCLOGIN URL", e2)
                 // Fallback: copy to clipboard
                 copyDcloginToClipboard(dcloginUrl)
             }
@@ -366,7 +434,15 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
 
     private fun copyDcloginToClipboard(dcloginUrl: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("DCLOGIN", dcloginUrl)
+        val clip = android.content.ClipData.newPlainText("DCLOGIN", dcloginUrl).apply {
+            // Mark as sensitive so Android 13+ password managers/keyboards
+            // do not preview or persist this clip
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                description.extras = android.os.PersistableBundle().apply {
+                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                }
+            }
+        }
         clipboard.setPrimaryClip(clip)
 
         Snackbar.make(
@@ -400,7 +476,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                 }
                 .show()
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error generating QR code", e)
+            TyrLogger.e("MainActivity", "Error generating QR code", e)
             Snackbar.make(
                 binding.root,
                 R.string.qr_code_error,
@@ -419,7 +495,7 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             val shareIntent = Intent.createChooser(sendIntent, null)
             startActivity(shareIntent)
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error sharing mailto URL", e)
+            TyrLogger.e("MainActivity", "Error sharing mailto URL", e)
             Snackbar.make(
                 binding.root,
                 R.string.qr_code_error,
@@ -467,18 +543,52 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             .show()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
+    private var settingsFragmentLoaded = false
+    private var chatFragmentLoaded = false
+
+    private fun setupBottomNavigation() {
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> {
+                    binding.contentHome.visibility = View.VISIBLE
+                    binding.contentChat.visibility = View.GONE
+                    binding.contentSettings.visibility = View.GONE
+                    true
+                }
+                R.id.nav_chat -> {
+                    showChatTab()
+                    true
+                }
+                R.id.nav_settings -> {
+                    showSettingsTab()
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_settings -> {
-                startActivity(Intent(this, SettingsActivity::class.java))
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
+    private fun showChatTab() {
+        binding.contentHome.visibility = View.GONE
+        binding.contentChat.visibility = View.VISIBLE
+        binding.contentSettings.visibility = View.GONE
+        if (!chatFragmentLoaded) {
+            chatFragmentLoaded = true
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.content_chat, ChatFragment())
+                .commitNow()
+        }
+    }
+
+    private fun showSettingsTab() {
+        binding.contentHome.visibility = View.GONE
+        binding.contentChat.visibility = View.GONE
+        binding.contentSettings.visibility = View.VISIBLE
+        if (!settingsFragmentLoaded) {
+            settingsFragmentLoaded = true
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.content_settings, SettingsFragment())
+                .commitNow()
         }
     }
 
@@ -594,13 +704,9 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      * Latency information comes directly from Yggdrasil transport layer
      */
     private fun startNetworkMonitoring() {
-        Log.d("MainActivity", "Starting network monitoring")
+        TyrLogger.d("MainActivity", "Starting network monitoring")
         networkStatsMonitor.start(object : NetworkStatsMonitor.NetworkStatsListener {
             override fun onStatsUpdated(stats: NetworkStatsMonitor.NetworkStats) {
-                Log.d("MainActivity", "onStatsUpdated called with ${stats.peers.size} peers")
-                stats.peers.forEach { peer ->
-                    Log.d("MainActivity", "  Peer: ${peer.host}:${peer.port}, connected=${peer.connected}, latencyMs=${peer.latencyMs}")
-                }
                 updateNetworkStatsUI(stats)
             }
         }, enableLatencyMeasurement = true) // Parameter kept for API compatibility
@@ -617,7 +723,6 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      * Update UI with network statistics
      */
     private fun updateNetworkStatsUI(stats: NetworkStatsMonitor.NetworkStats) {
-        Log.d("MainActivity", "updateNetworkStatsUI called, updating UI")
         // Connection type
         binding.textConnectionType.text = stats.connectionType
 
@@ -629,7 +734,6 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
      * Update the list of peers with latency information
      */
     private fun updatePeersList(peers: List<NetworkStatsMonitor.PeerInfo>) {
-        Log.d("MainActivity", "updatePeersList called with ${peers.size} peers")
         // Clear existing views
         binding.peersContainer.removeAllViews()
 
@@ -791,21 +895,17 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
     private fun checkForUpdatesInBackground() {
         if (!configRepository.shouldCheckForUpdates()) return
 
-        Thread {
-            val info = UpdateChecker(this).checkForUpdates()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val info = UpdateChecker(this@MainActivity).checkForUpdates()
             configRepository.setLastUpdateCheckTime(System.currentTimeMillis())
 
-            if (info == null || !info.hasUpdate) return@Thread
+            if (info == null || !info.hasUpdate) return@launch
+            if (info.latestVersion == configRepository.getDismissedUpdateVersion()) return@launch
 
-            // Don't show if user already dismissed this version
-            if (info.latestVersion == configRepository.getDismissedUpdateVersion()) return@Thread
-
-            runOnUiThread {
-                if (!isFinishing && !isDestroyed) {
-                    showUpdateDialog(info)
-                }
+            withContext(Dispatchers.Main) {
+                if (!isFinishing && !isDestroyed) showUpdateDialog(info)
             }
-        }.start()
+        }
     }
 
     private fun showUpdateDialog(info: UpdateChecker.UpdateInfo) {
@@ -846,24 +946,16 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         // Show card immediately if service is running
         binding.cardStorageQuota.visibility = View.VISIBLE
 
-        Thread {
+        lifecycleScope.launch(Dispatchers.IO) {
             val maxSizeInfo = yggmailService?.getMaxMessageSizeInfo()
             val storageStats = yggmailService?.getMailStorageStats()
 
-            runOnUiThread {
-                if (maxSizeInfo == null || storageStats == null) {
-                    // Keep card visible but don't update data
-                    return@runOnUiThread
-                }
+            withContext(Dispatchers.Main) {
+                if (maxSizeInfo == null || storageStats == null) return@withContext
 
-                // Show only maximum message size (maximum file size)
-                val quotaText = getString(R.string.max_file_size, maxSizeInfo.maxSizeMB)
-                binding.textQuotaInfo.text = quotaText
-
-                // Hide progress bar
+                binding.textQuotaInfo.text = getString(R.string.max_file_size, maxSizeInfo.maxSizeMB)
                 binding.quotaInfoProgress.visibility = View.GONE
 
-                // Update storage statistics
                 val storageText = buildString {
                     append(getString(R.string.storage_db_size, storageStats.dbSizeMB))
                     append("\n")
@@ -873,6 +965,31 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                 }
                 binding.textStorageInfo.text = storageText
             }
-        }.start()
+        }
+    }
+
+    /** Called by ChatFragment after opening/closing conversations to keep badge in sync. */
+    fun refreshChatBadge() = updateChatBadge()
+
+    /**
+     * Update the unread-chat-count badge on the chat nav item.
+     * Counts distinct conversations (not messages) that have unread incoming messages.
+     */
+    private fun updateChatBadge() {
+        val myAddress = configRepository.getMailAddress() ?: return
+        lifecycleScope.launch(Dispatchers.IO) {
+            val count = ChatRepository(this@MainActivity).getUnreadChatCount(myAddress)
+            withContext(Dispatchers.Main) {
+                if (!isFinishing && !isDestroyed) {
+                    val badge = binding.bottomNavigation.getOrCreateBadge(R.id.nav_chat)
+                    if (count > 0) {
+                        badge.isVisible = true
+                        badge.number = count
+                    } else {
+                        binding.bottomNavigation.removeBadge(R.id.nav_chat)
+                    }
+                }
+            }
+        }
     }
 }

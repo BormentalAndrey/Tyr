@@ -1,1 +1,1 @@
-True peer-to-peer email using Yggdrasil network. No central servers required.
+True P2P email and built-in chat over Yggdrasil network. No central servers.

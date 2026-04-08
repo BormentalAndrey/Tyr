@@ -6,8 +6,8 @@ import android.net.NetworkCapabilities
 import android.net.TrafficStats
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.jbselfcompany.tyr.TyrApplication
+import com.jbselfcompany.tyr.utils.TyrLogger
 import kotlin.math.roundToInt
 
 /**
@@ -57,7 +57,7 @@ class NetworkStatsMonitor(private val context: Context) {
                 // Run stats update in background thread
                 backgroundHandler?.post {
                     updateStats()
-                } ?: Log.w(TAG, "Background handler is null, skipping update")
+                } ?: TyrLogger.w(TAG, "Background handler is null, skipping update")
                 handler.postDelayed(this, UPDATE_INTERVAL_MS)
             }
         }
@@ -69,7 +69,7 @@ class NetworkStatsMonitor(private val context: Context) {
     fun start(listener: NetworkStatsListener, enableLatencyMeasurement: Boolean = true) {
         if (isMonitoring) {
             // Already monitoring - update the listener and trigger immediate refresh
-            Log.d(TAG, "Already monitoring, updating listener")
+            TyrLogger.d(TAG, "Already monitoring, updating listener")
             this.listener = listener
             this.measureLatency = enableLatencyMeasurement
             backgroundHandler?.post { updateStats() }
@@ -103,7 +103,7 @@ class NetworkStatsMonitor(private val context: Context) {
             }
         }, RECONNECT_CATCHUP_DELAY_MS)
 
-        Log.d(TAG, "Network monitoring started")
+        TyrLogger.d(TAG, "Network monitoring started")
     }
 
     /**
@@ -124,7 +124,7 @@ class NetworkStatsMonitor(private val context: Context) {
         backgroundThread = null
         backgroundHandler = null
 
-        Log.d(TAG, "Network monitoring stopped")
+        TyrLogger.d(TAG, "Network monitoring stopped")
     }
 
     /**
@@ -163,17 +163,11 @@ class NetworkStatsMonitor(private val context: Context) {
 
             // Notify listener on main thread
             handler.post {
-                Log.d(TAG, "Calling listener with ${peers.size} peers (listener is ${if (listener != null) "not null" else "null"})")
-                peers.forEach { peer ->
-                    Log.d(TAG, "  Peer data: ${peer.host}:${peer.port}, connected=${peer.connected}, latencyMs=${peer.latencyMs}")
-                }
                 listener?.onStatsUpdated(stats)
             }
 
-            Log.d(TAG, "Updated stats: ${peers.size} peers")
-
         } catch (e: Exception) {
-            Log.e(TAG, "Error updating network stats", e)
+            TyrLogger.e(TAG, "Error updating network stats", e)
         }
     }
 
@@ -190,13 +184,13 @@ class NetworkStatsMonitor(private val context: Context) {
             when {
                 capabilities == null -> "Unknown"
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Mobile Data"
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> context.getString(com.jbselfcompany.tyr.R.string.connection_type_mobile_data)
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
                 else -> "Unknown"
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting connection type", e)
+            TyrLogger.e(TAG, "Error getting connection type", e)
             "Unknown"
         }
     }

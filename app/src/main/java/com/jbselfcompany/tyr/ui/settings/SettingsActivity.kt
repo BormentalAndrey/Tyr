@@ -23,10 +23,15 @@ import com.jbselfcompany.tyr.service.YggmailService
 import com.jbselfcompany.tyr.ui.SettingsAdapter
 import com.jbselfcompany.tyr.ui.AboutActivity
 import com.jbselfcompany.tyr.ui.BaseActivity
+import com.jbselfcompany.tyr.ui.MainActivity
 import com.jbselfcompany.tyr.ui.logs.LogsActivity
 import com.jbselfcompany.tyr.utils.BackupManager
 import com.jbselfcompany.tyr.utils.UpdateChecker
 import com.jbselfcompany.tyr.data.ConfigRepository
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Settings activity for managing Yggdrasil peers and service configuration
@@ -90,6 +95,38 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
 
         setupRecyclerView()
         createSettingsItems()
+        setupBottomNavigation()
+    }
+
+    private fun setupBottomNavigation() {
+        binding.bottomNavigation.selectedItemId = R.id.nav_settings
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_settings -> true
+                R.id.nav_home -> {
+                    val opts = android.app.ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle()
+                    startActivity(Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    }, opts)
+                    finish()
+                    @Suppress("DEPRECATION")
+                    overridePendingTransition(0, 0)
+                    true
+                }
+                R.id.nav_chat -> {
+                    val opts = android.app.ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle()
+                    startActivity(Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_CHAT)
+                    }, opts)
+                    finish()
+                    @Suppress("DEPRECATION")
+                    overridePendingTransition(0, 0)
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     private fun setupRecyclerView() {
@@ -550,6 +587,9 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
         return when (item.itemId) {
             android.R.id.home -> {
                 finish()
+                // Suppress return animation to match tab-switch behaviour
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -709,7 +749,7 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
                 if (selectedLanguage != currentLanguage) {
                     configRepository.setLanguage(selectedLanguage)
                     dialog.dismiss()
-                    showRestartAppDialog()
+                    recreate()
                 } else {
                     dialog.dismiss()
                 }
@@ -744,41 +784,13 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
                 if (selectedTheme != currentTheme) {
                     configRepository.setTheme(selectedTheme)
                     dialog.dismiss()
-                    showRestartAppDialog()
+                    applyTheme(selectedTheme)
                 } else {
                     dialog.dismiss()
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
-    }
-
-    private fun showRestartAppDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.restart_required)
-            .setMessage(R.string.restart_app_required)
-            .setPositiveButton(R.string.restart_now) { _, _ ->
-                restartApp()
-            }
-            .setNegativeButton(R.string.restart_later, null)
-            .show()
-    }
-
-    private fun restartApp() {
-        // Show loading overlay
-        showLoadingOverlay(true, getString(R.string.restart_app_required))
-
-        // Short delay to show the overlay, then restart the app
-        Handler(Looper.getMainLooper()).postDelayed({
-            // Get the launch intent for MainActivity
-            val intent = Intent(this, com.jbselfcompany.tyr.ui.MainActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            startActivity(intent)
-            finishAffinity() // Close all activities
-
-            // Exit the process gracefully
-            Runtime.getRuntime().exit(0)
-        }, 500)
     }
 
     private fun applyTheme(theme: String) {
@@ -869,23 +881,17 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
     private fun saveUnreadQuota(service: YggmailService, quotaMB: Long) {
         showLoadingOverlay(true, getString(R.string.saving_quota))
 
-        Thread {
+        lifecycleScope.launch(Dispatchers.IO) {
             val success = service.setMaxMessageSizeMB(quotaMB)
-
-            runOnUiThread {
+            withContext(Dispatchers.Main) {
                 showLoadingOverlay(false)
-
                 if (success) {
-                    Toast.makeText(
-                        this,
-                        getString(R.string.quota_saved, quotaMB),
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@SettingsActivity, getString(R.string.quota_saved, quotaMB), Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this, R.string.error_saving_quota, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SettingsActivity, R.string.error_saving_quota, Toast.LENGTH_SHORT).show()
                 }
             }
-        }.start()
+        }
     }
 
     private fun showClearOutboundQueueDialog() {
@@ -904,60 +910,44 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
 
         showLoadingOverlay(true, getString(R.string.loading_queue_info))
 
-        Thread {
+        lifecycleScope.launch(Dispatchers.IO) {
             val count = service.getOutboundQueueCount()
-
-            runOnUiThread {
+            withContext(Dispatchers.Main) {
                 showLoadingOverlay(false)
-
                 if (count < 0) {
-                    Toast.makeText(this, R.string.error_loading_queue_info, Toast.LENGTH_SHORT).show()
-                    return@runOnUiThread
+                    Toast.makeText(this@SettingsActivity, R.string.error_loading_queue_info, Toast.LENGTH_SHORT).show()
+                    return@withContext
                 }
-
-                val message = if (count == 0) {
-                    getString(R.string.outbound_queue_empty)
-                } else {
-                    getString(R.string.outbound_queue_clear_confirmation, count)
-                }
-
-                val builder = MaterialAlertDialogBuilder(this)
+                val message = if (count == 0) getString(R.string.outbound_queue_empty)
+                              else getString(R.string.outbound_queue_clear_confirmation, count)
+                val builder = MaterialAlertDialogBuilder(this@SettingsActivity)
                     .setTitle(R.string.clear_outbound_queue)
                     .setMessage(message)
-
                 if (count > 0) {
-                    builder
-                        .setPositiveButton(R.string.ok) { _, _ -> clearOutboundQueue(service) }
-                        .setNegativeButton(R.string.cancel, null)
+                    builder.setPositiveButton(R.string.ok) { _, _ -> clearOutboundQueue(service) }
+                           .setNegativeButton(R.string.cancel, null)
                 } else {
                     builder.setPositiveButton(R.string.ok, null)
                 }
-
                 builder.show()
             }
-        }.start()
+        }
     }
 
     private fun clearOutboundQueue(service: YggmailService) {
         showLoadingOverlay(true, getString(R.string.clearing_queue))
 
-        Thread {
+        lifecycleScope.launch(Dispatchers.IO) {
             val cleared = service.clearOutboundQueue()
-
-            runOnUiThread {
+            withContext(Dispatchers.Main) {
                 showLoadingOverlay(false)
-
                 if (cleared < 0) {
-                    Toast.makeText(this, R.string.error_clearing_queue, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@SettingsActivity, R.string.error_clearing_queue, Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(
-                        this,
-                        getString(R.string.queue_cleared, cleared),
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@SettingsActivity, getString(R.string.queue_cleared, cleared), Toast.LENGTH_SHORT).show()
                 }
             }
-        }.start()
+        }
     }
 
     private fun showClearLogsDialog() {
@@ -1008,27 +998,22 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
     private fun checkForUpdatesNow() {
         showLoadingOverlay(true, getString(R.string.update_checking))
 
-        Thread {
-            val info = UpdateChecker(this).checkForUpdates()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val info = UpdateChecker(this@SettingsActivity).checkForUpdates()
             configRepository.setLastUpdateCheckTime(System.currentTimeMillis())
-
-            runOnUiThread {
+            withContext(Dispatchers.Main) {
                 showLoadingOverlay(false)
                 if (info == null) {
-                    Toast.makeText(this, R.string.update_check_failed, Toast.LENGTH_LONG).show()
-                    return@runOnUiThread
+                    Toast.makeText(this@SettingsActivity, R.string.update_check_failed, Toast.LENGTH_LONG).show()
+                    return@withContext
                 }
                 if (!info.hasUpdate) {
-                    Toast.makeText(
-                        this,
-                        getString(R.string.update_no_updates, info.currentVersion),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return@runOnUiThread
+                    Toast.makeText(this@SettingsActivity, getString(R.string.update_no_updates, info.currentVersion), Toast.LENGTH_SHORT).show()
+                    return@withContext
                 }
                 showUpdateDialog(info)
             }
-        }.start()
+        }
     }
 
     private fun showUpdateDialog(info: UpdateChecker.UpdateInfo) {

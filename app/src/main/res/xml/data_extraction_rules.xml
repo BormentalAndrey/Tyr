@@ -6,4 +6,10 @@
         <!-- Exclude encrypted preferences (encryption key won't be available after restore) -->
         <exclude domain="sharedpref" path="tyr_secure_prefs.xml" />
     </cloud-backup>
+    <!-- Android 12+: device-to-device transfers must also exclude sensitive files -->
+    <device-transfer>
+        <exclude domain="sharedpref" path="tyr_config.xml" />
+        <exclude domain="database" path="yggmail.db" />
+        <exclude domain="sharedpref" path="tyr_secure_prefs.xml" />
+    </device-transfer>
 </data-extraction-rules>

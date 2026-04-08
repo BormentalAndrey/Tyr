@@ -42,6 +42,9 @@
     <string name="connection_online">В сети</string>
     <string name="connection_offline">Не в сети</string>
     <string name="connection_connecting">Подключение…</string>
+    <string name="notification_peers_connected">%d пир(а) подключено</string>
+    <string name="notification_peers_connected_ping">%1$d пир(а) • %2$d мс</string>
+    <string name="notification_no_connection">Нет подключения</string>
 
     <!-- Status Display -->
     <string name="status_starting">Запуск…</string>
@@ -58,6 +61,7 @@
     <!-- Network Statistics -->
     <string name="network_statistics">Статус соединения</string>
     <string name="connection_type">Тип соединения</string>
+    <string name="connection_type_mobile_data">Мобильные данные</string>
     <string name="configured_peers">Настроенные пиры</string>
     <string name="active_peer">Активный пир</string>
     <string name="peer_status">Статус</string>
@@ -206,6 +210,7 @@
     <string name="clear_logs">Очистить логи</string>
     <string name="clear_logs_description">Очистить накопленные логи и начать получать свежие</string>
     <string name="tyr_logs">Логи Tyr</string>
+    <string name="loading_logs">Загрузка логов…</string>
     <string name="no_logs_available">Логи отсутствуют</string>
     <string name="no_logs_to_share">Нет логов для отправки</string>
     <string name="no_logs_to_copy">Нет логов для копирования</string>
@@ -217,6 +222,8 @@
     <string name="error_loading_logs">Ошибка загрузки логов: %s</string>
     <string name="error_clearing_logs">Не удалось очистить логи</string>
     <string name="log_collection_disabled">Сбор логов отключен.\n\nЧтобы просматривать логи, включите сбор логов в:\nНастройки → Отладка → Включить сбор логов</string>
+    <string name="log_collection_enabled">Сбор логов включён</string>
+    <string name="log_collection_disabled_snackbar">Сбор логов отключён</string>
     <string name="select_log_interval">Выберите интервал логов</string>
     <string name="interval_10_minutes">10 минут</string>
     <string name="interval_30_minutes">30 минут</string>
@@ -365,6 +372,11 @@
     <string name="manual_peer_description">Для локальных или частных пиров (например, локальная точка доступа)</string>
     <string name="manual_peer_hint">quic://192.168.x.x:порт</string>
     <string name="error_invalid_peer_url">Неверный URL пира. Используйте формат tcp://, tls:// или quic://</string>
+    <string name="error_peer_url_newlines">URL пира не может содержать переносы строк</string>
+    <string name="peer_prefix_added">Префикс tcp:// добавлен автоматически</string>
+    <string name="peer_already_exists">Пир уже существует</string>
+    <string name="peer_enabled">Пир включён</string>
+    <string name="peer_disabled">Пир отключён</string>
 
     <!-- Update Check Settings -->
     <string name="updates_settings">Обновления</string>
@@ -386,4 +398,92 @@
     <string name="update_available_fdroid">На GitHub доступна версия %1$s.\n\nУ вас установлена версия %2$s.\n\nПоскольку вы установили приложение через F-Droid, обновление появится там через несколько дней. Вы также можете скачать его с GitHub прямо сейчас.</string>
     <string name="update_download">Скачать</string>
     <string name="update_skip_version">Пропустить эту версию</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">Главная</string>
+    <string name="nav_chat">Чат</string>
+    <string name="nav_settings">Настройки</string>
+    <string name="chat_coming_soon">Чат — скоро будет</string>
+
+    <!-- Built-in Chat -->
+    <string name="chat_empty_contacts">Контактов пока нет.\nНажмите + чтобы добавить контакт.</string>
+    <string name="chat_add_contact">Добавить контакт</string>
+    <string name="chat_add_manually">Вручную</string>
+    <string name="chat_scan_qr">Сканировать QR</string>
+    <string name="chat_address_hint">yggmail-адрес (64hex@yggmail)</string>
+    <string name="chat_contact_name_hint">Имя (необязательно)</string>
+    <string name="chat_add_contact_button">Добавить контакт</string>
+    <string name="chat_scan_qr_description">Отсканируйте QR-код с экрана Настройка почты другого пользователя</string>
+    <string name="chat_scan_qr_button">Открыть сканер</string>
+    <string name="chat_scan_qr_hint">Сканировать QR-код mailto:</string>
+    <string name="chat_invalid_address">Неверный адрес. Должен быть 64 hex символа, затем @yggmail</string>
+    <string name="chat_invalid_address_qr">QR-код не содержит корректный yggmail-адрес</string>
+    <string name="chat_cannot_add_self">Нельзя добавить собственный адрес</string>
+    <string name="chat_contact_already_exists">Этот контакт уже добавлен</string>
+    <string name="chat_contact_added">Контакт добавлен</string>
+    <string name="chat_rename_contact">Переименовать</string>
+    <string name="chat_delete_contact">Удалить контакт</string>
+    <string name="chat_delete_contact_confirmation">Удалить контакт %s?</string>
+    <string name="chat_delete">Удалить</string>
+    <string name="chat_message_hint">Сообщение…</string>
+    <string name="chat_send">Отправить</string>
+    <string name="chat_send_error">Ошибка отправки: %s</string>
+    <string name="chat_last_message_you">Вы: %s</string>
+    <string name="chat_message_status_desc">Статус сообщения</string>
+    <string name="chat_message_copied">Скопировано</string>
+    <string name="chat_message_menu_copy">Копировать</string>
+
+    <!-- Chat Settings -->
+    <string name="chat_settings">Чат</string>
+    <string name="chat_accept_non_contacts">Принимать сообщения от незнакомцев</string>
+    <string name="chat_accept_non_contacts_description">Показывать предпросмотр сообщений от пользователей не из контактов</string>
+    <!-- Stranger message prompt -->
+    <string name="chat_stranger_message_title">Сообщение от неизвестного контакта</string>
+    <string name="chat_stranger_message_body">%1$s написал вам:\n\n%2$s</string>
+    <string name="chat_stranger_accept">Принять</string>
+    <string name="chat_stranger_decline">Отклонить</string>
+    <string name="chat_pending_banner">Новое сообщение от неизвестного отправителя</string>
+    <string name="chat_pending_accept">Принять</string>
+    <string name="chat_pending_decline">Отклонить</string>
+    <string name="chat_pending_label">Новый контакт</string>
+
+    <!-- Keystore recovery warning -->
+    <string name="keystore_recovery_title">Сброс защищённого хранилища</string>
+    <string name="keystore_recovery_message">В Android Keystore на этом устройстве произошла ошибка, и зашифрованные настройки были сброшены. Пожалуйста, введите пароль повторно в настройках приложения для восстановления работы сервиса.</string>
+
+    <!-- Chat notifications -->
+    <string name="notification_channel_chat">Чат</string>
+    <string name="notification_channel_chat_desc">Уведомления о новых сообщениях чата</string>
+    <string name="notification_new_message_from">Новое сообщение от %s</string>
+    <string name="notification_new_messages_from">%1$d новых сообщений от %2$s</string>
+
+    <!-- File attachments -->
+    <string name="attach_file">Файл</string>
+    <string name="attach_photo">Фото</string>
+    <string name="attach_image_preview">Изображение</string>
+    <string name="chat_attachment_button">Прикрепить фото</string>
+    <string name="chat_file_too_large">Фото слишком большое. Максимальный размер: %d МБ</string>
+    <string name="chat_attachment_error">Не удалось прикрепить фото</string>
+    <string name="chat_photo_invalid">Поддерживаются только изображения</string>
+    <string name="chat_send_with_attachment">Отправка с вложением…</string>
+    <string name="chat_attachment_size_mb">%.1f МБ</string>
+    <string name="chat_attachment_size_kb">%d КБ</string>
+    <string name="chat_message_error_desc">Не отправлено</string>
+
+    <!-- Chat list preview labels for attachments -->
+    <string name="chat_preview_photo">🖼️ Фото</string>
+    <string name="chat_preview_file">📎 Файл</string>
+
+    <!-- Reply to message -->
+    <string name="chat_reply_to">Ответ на</string>
+    <string name="chat_reply_cancel">Отменить ответ</string>
+    <string name="chat_date_today">Сегодня</string>
+    <string name="chat_date_yesterday">Вчера</string>
+    <string name="chat_contact_profile">Профиль контакта</string>
+    <string name="chat_contact_email_label">Адрес электронной почты</string>
+    <string name="chat_contact_display_name_label">Отображаемое имя</string>
+    <string name="chat_my_nickname_label">Моё имя</string>
+    <string name="chat_my_nickname_hint">Ваше имя (отправляется контактам)</string>
+    <string name="chat_my_nickname_info">Это имя будет отправляться контактам вместе с сообщениями.</string>
+    <string name="chat_my_profile">Мой профиль</string>
 </resources>

@@ -29,6 +29,8 @@
         <!-- Force pure white text color -->
         <item name="android:textColorPrimary">#FFFFFF</item>
         <item name="android:textColor">#FFFFFF</item>
-        <item name="android:textColorSecondary">#FFFFFF</item>
+        <!-- Use a color state list XML file (not a direct hex) so that
+             resolveAttribute returns a valid resourceId on MIUI devices -->
+        <item name="android:textColorSecondary">@color/text_color_secondary</item>
     </style>
 </resources>

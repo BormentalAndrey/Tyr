@@ -42,6 +42,9 @@
     <string name="connection_online">Online</string>
     <string name="connection_offline">Offline</string>
     <string name="connection_connecting">Connecting…</string>
+    <string name="notification_peers_connected">%d peers connected</string>
+    <string name="notification_peers_connected_ping">%1$d peers • %2$d ms</string>
+    <string name="notification_no_connection">No connection</string>
 
     <!-- Status Display -->
     <string name="status_starting">Starting…</string>
@@ -58,6 +61,7 @@
     <!-- Network Statistics -->
     <string name="network_statistics">Connection status</string>
     <string name="connection_type">Connection Type</string>
+    <string name="connection_type_mobile_data">Mobile Data</string>
     <string name="configured_peers">Configured Peers</string>
     <string name="active_peer">Active Peer</string>
     <string name="peer_status">Status</string>
@@ -205,6 +209,7 @@
     <string name="clear_logs">Clear Logs</string>
     <string name="clear_logs_description">Clear accumulated logs and start fresh</string>
     <string name="tyr_logs">Tyr Logs</string>
+    <string name="loading_logs">Loading logs…</string>
     <string name="no_logs_available">No logs available</string>
     <string name="no_logs_to_share">No logs to share</string>
     <string name="no_logs_to_copy">No logs to copy</string>
@@ -216,6 +221,8 @@
     <string name="error_loading_logs">Error loading logs: %s</string>
     <string name="error_clearing_logs">Failed to clear logs</string>
     <string name="log_collection_disabled">Log collection is disabled.\n\nTo view logs, enable log collection in:\nSettings → Debug Settings → Enable Log Collection</string>
+    <string name="log_collection_enabled">Log collection enabled</string>
+    <string name="log_collection_disabled_snackbar">Log collection disabled</string>
     <string name="select_log_interval">Select log interval</string>
     <string name="interval_10_minutes">10 minutes</string>
     <string name="interval_30_minutes">30 minutes</string>
@@ -364,6 +371,11 @@
     <string name="manual_peer_description">For local or private peers (e.g. local hotspot node)</string>
     <string name="manual_peer_hint">quic://192.168.x.x:port</string>
     <string name="error_invalid_peer_url">Invalid peer URL. Use tcp://, tls://, or quic:// format</string>
+    <string name="error_peer_url_newlines">Peer URL cannot contain newlines</string>
+    <string name="peer_prefix_added">Added tcp:// prefix automatically</string>
+    <string name="peer_already_exists">Peer already exists</string>
+    <string name="peer_enabled">Peer enabled</string>
+    <string name="peer_disabled">Peer disabled</string>
 
     <!-- Update Check Settings -->
     <string name="updates_settings">Updates</string>
@@ -385,4 +397,92 @@
     <string name="update_available_fdroid">Version %1$s is available on GitHub.\n\nYou have %2$s.\n\nSince you installed via F-Droid, the update will appear there in a few days. You can also download it from GitHub now.</string>
     <string name="update_download">Download</string>
     <string name="update_skip_version">Skip This Version</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_settings">Settings</string>
+    <string name="chat_coming_soon">Chat — coming soon</string>
+
+    <!-- Built-in Chat -->
+    <string name="chat_empty_contacts">No contacts yet.\nTap + to add a contact.</string>
+    <string name="chat_add_contact">Add Contact</string>
+    <string name="chat_add_manually">Manual</string>
+    <string name="chat_scan_qr">Scan QR</string>
+    <string name="chat_address_hint">yggmail address (64hex@yggmail)</string>
+    <string name="chat_contact_name_hint">Name (optional)</string>
+    <string name="chat_add_contact_button">Add Contact</string>
+    <string name="chat_scan_qr_description">Scan the QR code from another user\'s Mail Configuration screen</string>
+    <string name="chat_scan_qr_button">Open Scanner</string>
+    <string name="chat_scan_qr_hint">Scan mailto: QR code</string>
+    <string name="chat_invalid_address">Invalid address. Must be 64 hex chars followed by @yggmail</string>
+    <string name="chat_invalid_address_qr">QR code does not contain a valid yggmail address</string>
+    <string name="chat_cannot_add_self">You cannot add your own address</string>
+    <string name="chat_contact_already_exists">This contact is already added</string>
+    <string name="chat_contact_added">Contact added</string>
+    <string name="chat_rename_contact">Rename</string>
+    <string name="chat_delete_contact">Delete contact</string>
+    <string name="chat_delete_contact_confirmation">Delete contact %s?</string>
+    <string name="chat_delete">Delete</string>
+    <string name="chat_message_hint">Message…</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_send_error">Failed to send: %s</string>
+    <string name="chat_last_message_you">You: %s</string>
+    <string name="chat_message_status_desc">Message status</string>
+    <string name="chat_message_copied">Copied</string>
+    <string name="chat_message_menu_copy">Copy</string>
+
+    <!-- Chat Settings -->
+    <string name="chat_settings">Chat</string>
+    <string name="chat_accept_non_contacts">Accept messages from strangers</string>
+    <string name="chat_accept_non_contacts_description">Show preview of messages from users not in your contacts</string>
+    <!-- Stranger message prompt -->
+    <string name="chat_stranger_message_title">Message from unknown contact</string>
+    <string name="chat_stranger_message_body">%1$s sent you a message:\n\n%2$s</string>
+    <string name="chat_stranger_accept">Accept</string>
+    <string name="chat_stranger_decline">Decline</string>
+    <string name="chat_pending_banner">New message from unknown sender</string>
+    <string name="chat_pending_accept">Accept</string>
+    <string name="chat_pending_decline">Decline</string>
+    <string name="chat_pending_label">New contact</string>
+
+    <!-- Keystore recovery warning -->
+    <string name="keystore_recovery_title">Security storage reset</string>
+    <string name="keystore_recovery_message">The Android Keystore on this device had an issue and your encrypted settings were reset. Please re-enter your password in the app settings to restore service.</string>
+
+    <!-- Chat notifications -->
+    <string name="notification_channel_chat">Chat</string>
+    <string name="notification_channel_chat_desc">Notifications for new chat messages</string>
+    <string name="notification_new_message_from">New message from %s</string>
+    <string name="notification_new_messages_from">%1$d new messages from %2$s</string>
+
+    <!-- File attachments -->
+    <string name="attach_file">File</string>
+    <string name="attach_photo">Photo</string>
+    <string name="attach_image_preview">Image attachment</string>
+    <string name="chat_attachment_button">Attach photo</string>
+    <string name="chat_file_too_large">Photo too large. Maximum size: %d MB</string>
+    <string name="chat_attachment_error">Failed to attach photo</string>
+    <string name="chat_photo_invalid">Only image files are supported</string>
+    <string name="chat_send_with_attachment">Sending with attachment…</string>
+    <string name="chat_attachment_size_mb">%.1f MB</string>
+    <string name="chat_attachment_size_kb">%d KB</string>
+    <string name="chat_message_error_desc">Failed to send</string>
+
+    <!-- Chat list preview labels for attachments -->
+    <string name="chat_preview_photo">🖼️ Photo</string>
+    <string name="chat_preview_file">📎 File</string>
+
+    <!-- Reply to message -->
+    <string name="chat_reply_to">Reply to</string>
+    <string name="chat_reply_cancel">Cancel reply</string>
+    <string name="chat_date_today">Today</string>
+    <string name="chat_date_yesterday">Yesterday</string>
+    <string name="chat_contact_profile">Contact Profile</string>
+    <string name="chat_contact_email_label">Email address</string>
+    <string name="chat_contact_display_name_label">Display name</string>
+    <string name="chat_my_nickname_label">My display name</string>
+    <string name="chat_my_nickname_hint">Your name (sent to contacts)</string>
+    <string name="chat_my_nickname_info">This name will be sent to your contacts with your messages.</string>
+    <string name="chat_my_profile">My Profile</string>
 </resources>

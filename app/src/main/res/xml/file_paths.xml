@@ -2,4 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Share files from cache directory (for logs export) -->
     <cache-path name="cache" path="." />
+    <!-- Chat attachments stored in files directory -->
+    <files-path name="attachments" path="attachments/" />
 </paths>

@@ -5,6 +5,7 @@
     <!-- Network permissions for Yggdrasil -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <!-- Query installed packages (Android 11+) -->
     <queries>
@@ -29,6 +30,17 @@
     <!-- Exact alarm permission for periodic maintenance (Android 12+) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
+    <!-- Camera permission for QR code scanning in built-in chat -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- File/media access for chat attachments -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
     <application
         android:name=".TyrApplication"
         android:allowBackup="true"
@@ -36,9 +48,10 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="@string/app_name"
+        android:label="${appLabel}"
         android:appCategory="productivity"
         android:extractNativeLibs="true"
+        android:memtagMode="off"
         android:theme="@style/Theme.Tyr"
         tools:targetApi="31">
 
@@ -110,6 +123,23 @@
                 android:value=".ui.settings.SettingsActivity" />
         </activity>
 
+        <!-- Chat Conversation Activity -->
+        <activity
+            android:name=".chat.ui.ConversationActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:parentActivityName=".ui.MainActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value=".ui.MainActivity" />
+        </activity>
+
+        <!-- QR Scanner - locked to portrait for fast vertical scan -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="portrait"
+            tools:replace="screenOrientation" />
+
         <!-- Yggmail Foreground Service -->
         <service
             android:name=".service.YggmailService"
@@ -137,7 +167,7 @@
         <!-- FileProvider for sharing log archives -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.jbselfcompany.tyr.fileprovider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

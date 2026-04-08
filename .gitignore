@@ -1,5 +1,6 @@
 .idea/
 local.properties
 release/
+debug/
 build/
 .omc/

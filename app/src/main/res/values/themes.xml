@@ -27,6 +27,10 @@
         <item name="colorSurfaceVariant">@color/md_theme_light_surfaceVariant</item>
         <item name="colorOnSurfaceVariant">@color/md_theme_light_onSurfaceVariant</item>
         <item name="colorOutline">@color/md_theme_light_outline</item>
+        <!-- Override textColorSecondary to a color state list XML file.
+             Prevents MIUI's MiuiResourcesImpl from resolving it to a direct hex value (resourceId=0),
+             which crashes NavigationBarMenuView.createDefaultColorStateList -->
+        <item name="android:textColorSecondary">@color/text_color_secondary</item>
     </style>
 
     <style name="Theme.Tyr" parent="Base.Theme.Tyr" />

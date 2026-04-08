@@ -2,7 +2,7 @@ package com.jbselfcompany.tyr.utils
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import com.jbselfcompany.tyr.utils.TyrLogger
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.io.File
@@ -22,6 +22,11 @@ object SecurePreferences {
     private const val SECURE_PREFS_NAME = "tyr_secure_prefs"
     private const val MASTER_KEY_ALIAS = "_androidx_security_master_key_"
 
+    // Written to plain SharedPreferences when Keystore recovery deletes encrypted data.
+    // Checked by MainActivity to warn the user that their password was lost.
+    const val RECOVERY_FLAG_PREFS = "tyr_keystore_recovery"
+    const val RECOVERY_FLAG_KEY = "recovery_performed"
+
     /**
      * Get or create encrypted SharedPreferences instance.
      * Uses AES256-GCM for encryption with keys stored in Android Keystore.
@@ -35,10 +40,10 @@ object SecurePreferences {
         return try {
             createEncryptedPreferences(context)
         } catch (e: GeneralSecurityException) {
-            Log.w(TAG, "GeneralSecurityException during EncryptedSharedPreferences creation. Attempting recovery...", e)
+            TyrLogger.w(TAG,"GeneralSecurityException during EncryptedSharedPreferences creation. Attempting recovery...", e)
             handleKeystoreException(context, e)
         } catch (e: Exception) {
-            Log.w(TAG, "Exception during EncryptedSharedPreferences creation. Attempting recovery...", e)
+            TyrLogger.w(TAG,"Exception during EncryptedSharedPreferences creation. Attempting recovery...", e)
             handleKeystoreException(context, e)
         }
     }
@@ -69,7 +74,7 @@ object SecurePreferences {
      * - https://stackoverflow.com/questions/65463893
      */
     private fun handleKeystoreException(context: Context, originalException: Exception): SharedPreferences {
-        Log.w(TAG, "Keystore exception detected. Clearing corrupted encrypted preferences and master key...")
+        TyrLogger.w(TAG,"Keystore exception detected. Clearing corrupted encrypted preferences and master key...")
 
         try {
             // Delete corrupted SharedPreferences file
@@ -78,13 +83,17 @@ object SecurePreferences {
             // Delete corrupted master key from Android Keystore
             deleteMasterKey()
 
-            Log.i(TAG, "Successfully cleared corrupted data. Recreating encrypted preferences...")
+            TyrLogger.i(TAG,"Successfully cleared corrupted data. Recreating encrypted preferences...")
+
+            // Notify the user at the next app open that their password was lost
+            context.getSharedPreferences(RECOVERY_FLAG_PREFS, android.content.Context.MODE_PRIVATE)
+                .edit().putBoolean(RECOVERY_FLAG_KEY, true).apply()
 
             // Recreate encrypted preferences
             return createEncryptedPreferences(context)
         } catch (recoveryException: Exception) {
-            Log.e(TAG, "Failed to recover from Keystore exception. Original exception:", originalException)
-            Log.e(TAG, "Recovery exception:", recoveryException)
+            TyrLogger.e(TAG,"Failed to recover from Keystore exception. Original exception:", originalException)
+            TyrLogger.e(TAG,"Recovery exception:", recoveryException)
             throw RuntimeException("Unable to create secure storage. This may be a device-specific Keystore issue.", recoveryException)
         }
     }
@@ -97,10 +106,10 @@ object SecurePreferences {
             val prefsFile = File(context.applicationInfo.dataDir + "/shared_prefs/${SECURE_PREFS_NAME}.xml")
             if (prefsFile.exists()) {
                 val deleted = prefsFile.delete()
-                Log.d(TAG, "Encrypted preferences file deleted: $deleted")
+                TyrLogger.d(TAG,"Encrypted preferences file deleted: $deleted")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting SharedPreferences file", e)
+            TyrLogger.e(TAG,"Error deleting SharedPreferences file", e)
         }
     }
 
@@ -114,10 +123,10 @@ object SecurePreferences {
 
             if (keyStore.containsAlias(MASTER_KEY_ALIAS)) {
                 keyStore.deleteEntry(MASTER_KEY_ALIAS)
-                Log.d(TAG, "Master key deleted from Keystore")
+                TyrLogger.d(TAG,"Master key deleted from Keystore")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting master key from Keystore", e)
+            TyrLogger.e(TAG,"Error deleting master key from Keystore", e)
         }
     }
 
@@ -129,7 +138,7 @@ object SecurePreferences {
             val prefs = getEncryptedPreferences(context)
             prefs.edit().putString(key, value).apply()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to save string value for key: $key", e)
+            TyrLogger.e(TAG,"Failed to save string value for key: $key", e)
             throw e
         }
     }
@@ -142,7 +151,7 @@ object SecurePreferences {
             val prefs = getEncryptedPreferences(context)
             prefs.getString(key, defaultValue)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to retrieve string value for key: $key", e)
+            TyrLogger.e(TAG,"Failed to retrieve string value for key: $key", e)
             throw e
         }
     }

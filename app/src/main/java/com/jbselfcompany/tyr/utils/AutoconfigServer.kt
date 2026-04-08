@@ -1,7 +1,7 @@
 package com.jbselfcompany.tyr.utils
 
 import android.content.Context
-import android.util.Log
+import com.jbselfcompany.tyr.utils.TyrLogger
 import com.jbselfcompany.tyr.TyrApplication
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -13,7 +13,7 @@ import java.net.Socket
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.concurrent.thread
+import java.util.concurrent.Executors
 
 /**
  * Simple HTTP server for DeltaChat autoconfig endpoint.
@@ -31,6 +31,9 @@ class AutoconfigServer(private val context: Context) {
     private var running = false
     private var serverThread: Thread? = null
 
+    // Bounded thread pool — prevents unbounded thread creation per HTTP connection
+    private val clientExecutor = Executors.newFixedThreadPool(4)
+
     // Store tokens with their creation time
     private val tokens = ConcurrentHashMap<String, Long>()
 
@@ -39,7 +42,7 @@ class AutoconfigServer(private val context: Context) {
      */
     fun start() {
         if (running) {
-            Log.w(TAG, "Server already running")
+            TyrLogger.w(TAG,"Server already running")
             return
         }
 
@@ -49,22 +52,22 @@ class AutoconfigServer(private val context: Context) {
             serverSocket?.bind(InetSocketAddress("127.0.0.1", PORT))
             running = true
 
-            serverThread = thread(name = "AutoconfigServer") {
-                Log.i(TAG, "Autoconfig server started on port $PORT")
+            serverThread = Thread({
+                TyrLogger.i(TAG,"Autoconfig server started on port $PORT")
 
                 while (running) {
                     try {
                         val socket = serverSocket?.accept()
-                        socket?.let { handleClient(it) }
+                        socket?.let { clientExecutor.execute { handleClient(it) } }
                     } catch (e: Exception) {
                         if (running) {
-                            Log.e(TAG, "Error accepting connection", e)
+                            TyrLogger.e(TAG,"Error accepting connection", e)
                         }
                     }
                 }
-            }
+            }, "AutoconfigServer").also { it.start() }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start server", e)
+            TyrLogger.e(TAG,"Failed to start server", e)
             running = false
         }
     }
@@ -79,9 +82,10 @@ class AutoconfigServer(private val context: Context) {
             serverSocket = null
             serverThread?.interrupt()
             serverThread = null
-            Log.i(TAG, "Autoconfig server stopped")
+            clientExecutor.shutdown()
+            TyrLogger.i(TAG,"Autoconfig server stopped")
         } catch (e: Exception) {
-            Log.e(TAG, "Error stopping server", e)
+            TyrLogger.e(TAG,"Error stopping server", e)
         }
     }
 
@@ -176,41 +180,40 @@ class AutoconfigServer(private val context: Context) {
      * Handle HTTP client connection
      */
     private fun handleClient(socket: Socket) {
-        thread {
-            try {
-                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                val writer = OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)
+        // Called from clientExecutor thread pool — no extra thread needed
+        try {
+            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+            val writer = OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)
 
-                // Read HTTP request line
-                val requestLine = reader.readLine() ?: ""
-                Log.d(TAG, "Request: $requestLine")
+            // Read HTTP request line
+            val requestLine = reader.readLine() ?: ""
+            TyrLogger.d(TAG,"Request: $requestLine")
 
-                // Read headers (we don't need them, but we must consume them)
-                var line: String?
-                do {
-                    line = reader.readLine()
-                } while (!line.isNullOrEmpty())
+            // Read headers (we don't need them, but we must consume them)
+            var line: String?
+            do {
+                line = reader.readLine()
+            } while (!line.isNullOrEmpty())
 
-                // Parse request
-                val parts = requestLine.split(" ")
-                if (parts.size >= 2) {
-                    val method = parts[0]
-                    val path = parts[1]
+            // Parse request
+            val parts = requestLine.split(" ")
+            if (parts.size >= 2) {
+                val method = parts[0]
+                val path = parts[1]
 
-                    if (method == "GET" && path.startsWith("/new_email")) {
-                        handleNewEmailRequest(path, writer)
-                    } else {
-                        send404(writer)
-                    }
+                if (method == "GET" && path.startsWith("/new_email")) {
+                    handleNewEmailRequest(path, writer)
                 } else {
-                    send400(writer)
+                    send404(writer)
                 }
-
-                writer.flush()
-                socket.close()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error handling client", e)
+            } else {
+                send400(writer)
             }
+
+            writer.flush()
+            socket.close()
+        } catch (e: Exception) {
+            TyrLogger.e(TAG,"Error handling client", e)
         }
     }
 
@@ -255,9 +258,9 @@ class AutoconfigServer(private val context: Context) {
             // Remove token after use (one-time use)
             tokens.remove(token)
 
-            Log.i(TAG, "Served autoconfig for $email")
+            TyrLogger.i(TAG,"Served autoconfig for $email")
         } catch (e: Exception) {
-            Log.e(TAG, "Error handling /new_email", e)
+            TyrLogger.e(TAG,"Error handling /new_email", e)
             send500(writer, "Internal server error")
         }
     }

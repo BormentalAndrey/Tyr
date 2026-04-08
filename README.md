@@ -51,6 +51,7 @@ But there is a network, called **[Yggdrasil](https://yggdrasil-network.github.io
 
 | Feature | Description |
 |---------|-------------|
+| 💬 **Built-in Tyr Chat** | Native P2P messenger — no third-party app needed. Send messages and photos directly over Yggdrasil |
 | 🔗 **Full DeltaChat/ArcaneChat Integration** | Seamless setup with the best decentralized messengers |
 | 📧 **Email Client Support** | Works with K-9 Mail, Thunderbird Mobile, FairEmail, and any SMTP/IMAP client |
 | 📱 **QR Code Sharing** | Generate and share mailto: links via QR codes |
@@ -70,15 +71,28 @@ But there is a network, called **[Yggdrasil](https://yggdrasil-network.github.io
 
 ```mermaid
 graph LR
-    A[DeltaChat/ArcaneChat] -->|SMTP/IMAP| B[Tyr Service]
-    B -->|Yggmail Protocol| C[Yggdrasil Network]
-    C -->|P2P Encrypted| D[Recipient's Tyr]
-    D -->|SMTP/IMAP| E[Recipient's Chat App]
+    A[Tyr Chat] -->|Built-in| B[Tyr Service]
+    C[DeltaChat/ArcaneChat] -->|SMTP/IMAP| B
+    B -->|Yggmail Protocol| D[Yggdrasil Network]
+    D -->|P2P Encrypted| E[Recipient's Tyr]
+    E -->|Built-in| F[Tyr Chat]
+    E -->|SMTP/IMAP| G[Recipient's Chat App]
 ```
 
 Tyr runs a complete email server right on your Android device, using the Yggdrasil network for transport. The **[Yggmail](https://github.com/JB-SelfCompany/yggmail-android)** mail server (built in Go) is embedded as a library inside the app and runs as a foreground service.
 
 On top of Yggdrasil, it provides standard **SMTP** and **IMAP** protocols on localhost (`127.0.0.1:1025` and `127.0.0.1:1143`). Any email client can connect to these ports - but we recommend **DeltaChat** or **ArcaneChat** for the best P2P messaging experience.
+
+### 💬 Built-in Tyr Chat
+
+Starting with version 1.8, Tyr includes a **native P2P messenger** — no third-party app required. Open a contact's address, start chatting right away. The chat works directly over Yggdrasil using the same encrypted P2P transport.
+
+**Chat features:**
+- Send and receive text messages and photos
+- Delivery status with checkmarks (sent / delivered)
+- Tap any message to copy its text
+- Auto-read: messages are marked as read the moment you open a conversation
+- Notifications are suppressed while you are actively in the chat
 
 ### 📬 Mail Address Format
 

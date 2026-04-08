@@ -10,6 +10,7 @@ import android.os.Looper
 import com.jbselfcompany.tyr.data.ConfigRepository
 import com.jbselfcompany.tyr.receiver.NetworkChangeReceiver
 import com.jbselfcompany.tyr.utils.LocaleHelper
+import com.jbselfcompany.tyr.utils.TyrLogger
 
 /**
  * Application class for Tyr.
@@ -23,6 +24,7 @@ class TyrApplication : Application() {
     companion object {
         const val CHANNEL_ID_SERVICE = "yggmail_service"
         const val CHANNEL_ID_MAIL = "mail_notifications"
+        const val CHANNEL_ID_CHAT = "chat_notifications"
 
         lateinit var instance: TyrApplication
             private set
@@ -43,6 +45,9 @@ class TyrApplication : Application() {
 
         // Initialize configuration repository
         configRepository = ConfigRepository(this)
+
+        // Initialize logger state from persisted preference (seamless toggle without restart)
+        TyrLogger.setEnabled(configRepository.isLogCollectionEnabled())
 
         // Apply theme preference
         LocaleHelper.applyTheme(this)
@@ -111,8 +116,19 @@ class TyrApplication : Application() {
                 setShowBadge(true)
             }
 
+            // Chat notification channel (high priority for heads-up notifications)
+            val chatChannel = NotificationChannel(
+                CHANNEL_ID_CHAT,
+                getString(R.string.notification_channel_chat),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.notification_channel_chat_desc)
+                setShowBadge(true)
+            }
+
             notificationManager.createNotificationChannel(serviceChannel)
             notificationManager.createNotificationChannel(mailChannel)
+            notificationManager.createNotificationChannel(chatChannel)
         }
     }
 }

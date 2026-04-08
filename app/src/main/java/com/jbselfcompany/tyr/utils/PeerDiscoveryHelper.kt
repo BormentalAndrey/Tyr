@@ -3,7 +3,7 @@ package com.jbselfcompany.tyr.utils
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.jbselfcompany.tyr.utils.TyrLogger
 import mobile.PeerDiscoveryCallback
 import java.io.File
 
@@ -46,7 +46,7 @@ object PeerDiscoveryHelper {
                 tempService = mobile.Mobile.newYggmailService(tempDbPath, tempSmtpAddr, tempImapAddr)
 
                 if (tempService == null) {
-                    Log.e(TAG, "Failed to create temporary service for peer discovery")
+                    TyrLogger.e(TAG,"Failed to create temporary service for peer discovery")
                     Handler(Looper.getMainLooper()).post { callback.onProgress(0, 0, 0) }
                     return@Thread
                 }
@@ -61,7 +61,7 @@ object PeerDiscoveryHelper {
                     override fun onProgress(current: Long, total: Long, availableCount: Long) {
                         callback.onProgress(current, total, availableCount)
                         if (total > 0 && current >= total) {
-                            closeTempService(svc)
+                            closeTempService(svc, context)
                         }
                     }
                     override fun onPeerAvailable(peerJSON: String) {
@@ -70,21 +70,31 @@ object PeerDiscoveryHelper {
                 }
 
                 tempService.findAvailablePeersAsync(protocols, region, maxRTTMs.toLong(), wrappedCallback)
-                Log.d(TAG, "Peer discovery started: protocols=$protocols, region=$region, maxRTT=${maxRTTMs}ms")
+                TyrLogger.d(TAG,"Peer discovery started: protocols=$protocols, region=$region, maxRTT=${maxRTTMs}ms")
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error starting peer discovery", e)
-                closeTempService(tempService)
+                TyrLogger.e(TAG,"Error starting peer discovery", e)
+                closeTempService(tempService, context)
                 Handler(Looper.getMainLooper()).post { callback.onProgress(0, 0, 0) }
             }
         }.apply { name = "PeerDiscovery" }.start()
     }
 
-    private fun closeTempService(service: mobile.YggmailService?) {
+    private fun closeTempService(service: mobile.YggmailService?, context: android.content.Context? = null) {
         if (service == null) return
         Thread {
-            try { service.stop() } catch (e: Exception) { Log.w(TAG, "Error stopping temp service", e) }
-            try { service.close() } catch (e: Exception) { Log.w(TAG, "Error closing temp service", e) }
+            try { service.stop() } catch (e: Exception) { TyrLogger.w(TAG,"Error stopping temp service", e) }
+            try { service.close() } catch (e: Exception) { TyrLogger.w(TAG,"Error closing temp service", e) }
+            // Delete the temporary DB so no key material is left on disk
+            try {
+                val tempDb = if (context != null) {
+                    java.io.File(context.cacheDir, "temp_peer_discovery.db")
+                } else null
+                tempDb?.delete()
+                TyrLogger.d(TAG,"Temporary peer discovery DB deleted")
+            } catch (e: Exception) {
+                TyrLogger.w(TAG,"Failed to delete temporary peer discovery DB", e)
+            }
         }.apply { name = "PeerDiscovery-Close"; start() }
     }
 }

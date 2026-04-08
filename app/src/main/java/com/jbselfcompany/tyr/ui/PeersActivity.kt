@@ -226,7 +226,7 @@ class PeersActivity : BaseActivity(), ServiceStatusListener {
                 }
 
                 if (peerUrl.contains("\n")) {
-                    Toast.makeText(this, "Peer URL cannot contain newlines", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.error_peer_url_newlines, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
 
@@ -235,7 +235,7 @@ class PeersActivity : BaseActivity(), ServiceStatusListener {
                 if (!peerUrl.contains("://")) {
                     // Auto-add tcp:// prefix if no protocol specified
                     peerUrl = "tcp://$peerUrl"
-                    Toast.makeText(this, "Added tcp:// prefix automatically", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.peer_prefix_added, Toast.LENGTH_SHORT).show()
                 }
 
                 // Validate protocol and URL structure using shared validator
@@ -246,7 +246,7 @@ class PeersActivity : BaseActivity(), ServiceStatusListener {
 
                 // Check for duplicates, excluding the peer being edited
                 if (peers.any { it.uri == peerUrl && it.uri != existingPeer?.uri }) {
-                    Toast.makeText(this, "Peer already exists", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.peer_already_exists, Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
 
@@ -309,7 +309,7 @@ class PeersActivity : BaseActivity(), ServiceStatusListener {
         hasUnsavedChanges = true
         updateApplyButtonVisibility()
 
-        Toast.makeText(this, if (enabled) "Peer enabled" else "Peer disabled", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, if (enabled) R.string.peer_enabled else R.string.peer_disabled, Toast.LENGTH_SHORT).show()
     }
 
     private fun applyPeerChanges() {

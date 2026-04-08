@@ -1,0 +1,7 @@
+• Built-in Tyr Chat — native P2P messenger, no separate email client required
+• Navbar redesign for improved usability and Material Design 3 consistency
+• Photo-only attachments in chat (image validation added)
+• Tap a message to open a context menu with a Copy option
+• Improved stability during peer reconnection and Doze Mode wake
+• Battery and performance optimizations across the service layer
+• Notification now shows peer count and average ping (e.g. "3 peers • 45 ms")

@@ -2,9 +2,9 @@ package com.jbselfcompany.tyr.data
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.core.content.edit
 import com.jbselfcompany.tyr.utils.SecurePreferences
+import com.jbselfcompany.tyr.utils.TyrLogger
 import org.json.JSONArray
 import org.json.JSONException
 
@@ -38,6 +38,17 @@ class ConfigRepository(private val context: Context) {
         private const val KEY_UPDATE_CHECK_INTERVAL_HOURS = "update_check_interval_hours"
         private const val KEY_LAST_UPDATE_CHECK_TIME = "last_update_check_time"
         private const val KEY_DISMISSED_UPDATE_VERSION = "dismissed_update_version"
+
+        // Chat settings
+        private const val KEY_ACCEPT_MESSAGES_FROM_NON_CONTACTS = "accept_messages_non_contacts"
+
+        // Max message size cache (MB) — mirrors the yggmail quota setting
+        private const val KEY_MAX_MESSAGE_SIZE_MB = "max_message_size_mb"
+
+        // Highest IMAP UID ever seen — never decreases even when messages are deleted.
+        // Used to prevent re-fetching old messages after a contact is deleted.
+        private const val KEY_LAST_SEEN_IMAP_UID = "last_seen_imap_uid"
+        const val DEFAULT_MAX_MESSAGE_SIZE_MB = 500L
 
         // Update check interval options
         const val UPDATE_INTERVAL_ON_START = 0
@@ -80,7 +91,7 @@ class ConfigRepository(private val context: Context) {
             // Check if there's a plaintext password that needs migration
             val plaintextPassword = prefs.getString(KEY_PASSWORD_HASH, null)
             if (!plaintextPassword.isNullOrEmpty() && !SecurePreferences.contains(context, KEY_PASSWORD_ENCRYPTED)) {
-                Log.i(TAG, "Migrating plaintext password to encrypted storage")
+                TyrLogger.i(TAG,"Migrating plaintext password to encrypted storage")
 
                 // Save to encrypted storage
                 SecurePreferences.putString(context, KEY_PASSWORD_ENCRYPTED, plaintextPassword)
@@ -88,10 +99,10 @@ class ConfigRepository(private val context: Context) {
                 // Remove from plaintext storage
                 prefs.edit { remove(KEY_PASSWORD_HASH) }
 
-                Log.i(TAG, "Password migration completed successfully")
+                TyrLogger.i(TAG,"Password migration completed successfully")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error during password migration", e)
+            TyrLogger.e(TAG,"Error during password migration", e)
         }
     }
 
@@ -108,7 +119,7 @@ class ConfigRepository(private val context: Context) {
             // Get old peers
             val oldPeersString = prefs.getString(KEY_PEERS, null)
             if (!oldPeersString.isNullOrEmpty()) {
-                Log.i(TAG, "Migrating peers to v2 format")
+                TyrLogger.i(TAG,"Migrating peers to v2 format")
 
                 val oldPeers = oldPeersString.split("\n")
                     .map { it.trim() }
@@ -119,13 +130,13 @@ class ConfigRepository(private val context: Context) {
 
                 savePeersV2(newPeers)
 
-                Log.i(TAG, "Peer migration completed successfully: ${newPeers.size} peers")
+                TyrLogger.i(TAG,"Peer migration completed successfully: ${newPeers.size} peers")
             } else {
                 // No old peers, just mark as migrated with empty list
                 savePeersV2(emptyList())
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error during peer migration", e)
+            TyrLogger.e(TAG,"Error during peer migration", e)
         }
     }
 
@@ -150,9 +161,9 @@ class ConfigRepository(private val context: Context) {
     fun savePassword(password: String) {
         try {
             SecurePreferences.putString(context, KEY_PASSWORD_ENCRYPTED, password)
-            Log.d(TAG, "Password saved securely")
+            TyrLogger.d(TAG,"Password saved securely")
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving password", e)
+            TyrLogger.e(TAG,"Error saving password", e)
             throw e
         }
     }
@@ -164,7 +175,7 @@ class ConfigRepository(private val context: Context) {
         return try {
             SecurePreferences.getString(context, KEY_PASSWORD_ENCRYPTED, null)
         } catch (e: Exception) {
-            Log.e(TAG, "Error retrieving password", e)
+            TyrLogger.e(TAG,"Error retrieving password", e)
             null
         }
     }
@@ -176,7 +187,7 @@ class ConfigRepository(private val context: Context) {
         return try {
             SecurePreferences.contains(context, KEY_PASSWORD_ENCRYPTED)
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking password", e)
+            TyrLogger.e(TAG,"Error checking password", e)
             false
         }
     }
@@ -206,7 +217,7 @@ class ConfigRepository(private val context: Context) {
             }
             prefs.edit { putString(KEY_PEERS_V2, jsonArray.toString()) }
         } catch (e: JSONException) {
-            Log.e(TAG, "Error saving peers v2", e)
+            TyrLogger.e(TAG,"Error saving peers v2", e)
         }
     }
 
@@ -229,7 +240,7 @@ class ConfigRepository(private val context: Context) {
                 peersList
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting peers v2", e)
+            TyrLogger.e(TAG,"Error getting peers v2", e)
             emptyList()
         }
     }
@@ -369,15 +380,23 @@ class ConfigRepository(private val context: Context) {
     }
 
     /**
-     * Set log collection enabled/disabled
+     * Set log collection enabled/disabled.
+     * Takes effect immediately — no service restart required.
      */
     fun setLogCollectionEnabled(enabled: Boolean) {
         prefs.edit { putBoolean(KEY_LOG_COLLECTION_ENABLED, enabled) }
+        TyrLogger.setEnabled(enabled)
     }
 
     /**
      * Save mail address generated by Yggmail service
      */
+    fun getNickname(): String = prefs.getString("my_nickname", "") ?: ""
+
+    fun setNickname(nickname: String) {
+        prefs.edit { putString("my_nickname", nickname) }
+    }
+
     fun saveMailAddress(address: String) {
         prefs.edit { putString(KEY_MAIL_ADDRESS, address) }
     }
@@ -422,7 +441,7 @@ class ConfigRepository(private val context: Context) {
         try {
             SecurePreferences.clear(context)
         } catch (e: Exception) {
-            Log.e(TAG, "Error clearing secure storage", e)
+            TyrLogger.e(TAG,"Error clearing secure storage", e)
         }
     }
 
@@ -479,7 +498,7 @@ class ConfigRepository(private val context: Context) {
             val cacheTTL = CACHE_TTL_HOURS * 60 * 60 * 1000L // Convert hours to milliseconds
 
             if (cacheAge > cacheTTL) {
-                Log.d(TAG, "Discovered peers cache expired (age: ${cacheAge / 1000 / 60 / 60}h)")
+                TyrLogger.d(TAG,"Discovered peers cache expired (age: ${cacheAge / 1000 / 60 / 60}h)")
                 return null
             }
 
@@ -490,11 +509,11 @@ class ConfigRepository(private val context: Context) {
                 peers.add(DiscoveredPeer.fromJson(jsonArray.getJSONObject(i)))
             }
 
-            Log.d(TAG, "Retrieved ${peers.size} cached discovered peers (age: ${cacheAge / 1000 / 60}min)")
+            TyrLogger.d(TAG,"Retrieved ${peers.size} cached discovered peers (age: ${cacheAge / 1000 / 60}min)")
             peers
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting cached discovered peers", e)
+            TyrLogger.e(TAG,"Error getting cached discovered peers", e)
             null
         }
     }
@@ -524,10 +543,10 @@ class ConfigRepository(private val context: Context) {
                 putLong(KEY_CACHE_TIMESTAMP, System.currentTimeMillis())
             }
 
-            Log.d(TAG, "Cached ${peers.size} discovered peers")
+            TyrLogger.d(TAG,"Cached ${peers.size} discovered peers")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error caching discovered peers", e)
+            TyrLogger.e(TAG,"Error caching discovered peers", e)
         }
     }
 
@@ -539,7 +558,7 @@ class ConfigRepository(private val context: Context) {
             remove(KEY_CACHED_DISCOVERED_PEERS)
             remove(KEY_CACHE_TIMESTAMP)
         }
-        Log.d(TAG, "Cleared discovered peers cache")
+        TyrLogger.d(TAG,"Cleared discovered peers cache")
     }
 
     // ============================================
@@ -587,4 +606,51 @@ class ConfigRepository(private val context: Context) {
         if (intervalMs == 0L) return true // always check on start
         return System.currentTimeMillis() - lastCheck > intervalMs
     }
+
+    // ============================================
+    // Chat Settings
+    // ============================================
+
+    /** If true, messages from senders not in contacts list will be shown with an accept/decline prompt. */
+    fun getAcceptMessagesFromNonContacts(): Boolean =
+        prefs.getBoolean(KEY_ACCEPT_MESSAGES_FROM_NON_CONTACTS, true)
+
+    fun setAcceptMessagesFromNonContacts(enabled: Boolean) {
+        prefs.edit { putBoolean(KEY_ACCEPT_MESSAGES_FROM_NON_CONTACTS, enabled) }
+    }
+
+    // ============================================
+    // Max Message Size Cache
+    // ============================================
+
+    /** Returns cached max incoming message size in MB (from yggmail quota setting). */
+    fun getCachedMaxMessageSizeMB(): Long =
+        prefs.getLong(KEY_MAX_MESSAGE_SIZE_MB, DEFAULT_MAX_MESSAGE_SIZE_MB)
+
+    /** Cache the current yggmail quota (call after setting/loading quota from service). */
+    fun cacheMaxMessageSizeMB(sizeMB: Long) {
+        prefs.edit { putLong(KEY_MAX_MESSAGE_SIZE_MB, sizeMB) }
+    }
+
+    // ============================================
+    // IMAP UID watermark
+    // ============================================
+
+    /**
+     * Returns the highest IMAP UID ever successfully fetched.
+     * This value never decreases — it is independent of the messages table,
+     * so deleting a contact's messages cannot cause old UIDs to be re-fetched.
+     */
+    fun getLastSeenImapUid(): Long =
+        prefs.getLong(KEY_LAST_SEEN_IMAP_UID, 0L)
+
+    /**
+     * Update the watermark. Only advances — never goes backwards.
+     */
+    fun advanceLastSeenImapUid(uid: Long) {
+        if (uid > getLastSeenImapUid()) {
+            prefs.edit { putLong(KEY_LAST_SEEN_IMAP_UID, uid) }
+        }
+    }
+
 }

@@ -3,6 +3,16 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// ── Version control ───────────────────────────────────────────────────────────
+// Release: bump for production releases (IzzyOnDroid / F-Droid)
+def RELEASE_VERSION_CODE = 27
+def RELEASE_VERSION_NAME = "1.8.0"
+
+// Dev (signed debug): bump independently of release
+def DEV_VERSION_CODE = 27
+def DEV_VERSION_NAME = "1.8.0-dev"
+// ─────────────────────────────────────────────────────────────────────────────
+
 android {
     namespace 'com.jbselfcompany.tyr'
     compileSdk 36
@@ -16,8 +26,8 @@ android {
         applicationId "com.jbselfcompany.tyr"
         minSdk 23
         targetSdk 33
-        versionCode 26
-        versionName "1.7.5"
+        versionCode RELEASE_VERSION_CODE
+        versionName RELEASE_VERSION_NAME
         resourceConfigurations += ['en', 'ru']
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
@@ -37,11 +47,14 @@ android {
 
     buildTypes {
         debug {
+            applicationIdSuffix ".dev"
+            manifestPlaceholders = [appLabel: "Tyr-dev"]
             minifyEnabled false
             shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         release {
+            manifestPlaceholders = [appLabel: "Tyr"]
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -80,8 +93,13 @@ android {
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def abiName = output.getFilter(com.android.build.OutputFile.ABI) ?: "universal"
-            def formattedDate = new Date().format('yyyyMMdd')
-            outputFileName = "Tyr-${variant.versionName}-${abiName}.apk"
+            if (variant.buildType.name == 'debug') {
+                output.versionCodeOverride = DEV_VERSION_CODE
+                output.versionNameOverride = DEV_VERSION_NAME
+                outputFileName = "Tyr-${DEV_VERSION_NAME}-${abiName}.apk"
+            } else {
+                outputFileName = "Tyr-${variant.versionName}-${abiName}.apk"
+            }
         }
     }
 }
@@ -93,6 +111,8 @@ dependencies {
     // AndroidX libraries
     implementation 'androidx.core:core-ktx:1.17.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
     implementation 'androidx.preference:preference-ktx:1.2.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'com.google.android.material:material:1.13.0'
@@ -101,11 +121,14 @@ dependencies {
     // Security - Encrypted SharedPreferences
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 
-    // WorkManager for battery-efficient background tasks
-    implementation 'androidx.work:work-runtime-ktx:2.9.0'
+    // EXIF metadata for image rotation correction
+    implementation 'androidx.exifinterface:exifinterface:1.3.7'
 
     // QR Code generation
     implementation 'com.google.zxing:core:3.5.3'
+
+    // QR Code scanning (camera-based)
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
 
     // Testing
     testImplementation 'junit:junit:4.13.2'

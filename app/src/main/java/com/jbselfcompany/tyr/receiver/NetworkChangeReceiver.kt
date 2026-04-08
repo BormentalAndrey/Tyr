@@ -8,8 +8,8 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.jbselfcompany.tyr.service.YggmailService
+import com.jbselfcompany.tyr.utils.TyrLogger
 
 /**
  * Network callback for detecting network changes (WiFi <-> Mobile Data)
@@ -31,7 +31,7 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
 
     override fun onAvailable(network: Network) {
         super.onAvailable(network)
-        Log.d(TAG, "Network available: $network")
+        TyrLogger.d(TAG, "Network available: $network")
 
         // Cancel both pending checks — a new network arrived, no need to handle prior loss
         pendingNetworkAvailableCheck?.let { handler.removeCallbacks(it) }
@@ -40,14 +40,14 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
         // Delay to let the network fully establish before reconnecting peers
         pendingNetworkAvailableCheck = Runnable {
             if (YggmailService.isRunning) {
-                Log.i(TAG, "Network available — triggering peer reconnection")
+                TyrLogger.i(TAG, "Network available — triggering peer reconnection")
                 try {
                     val intent = Intent(context, YggmailService::class.java).apply {
                         action = YggmailService.ACTION_RECONNECT_PEERS
                     }
                     context.startService(intent)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to trigger peer reconnection", e)
+                    TyrLogger.e(TAG, "Failed to trigger peer reconnection", e)
                 }
             }
         }
@@ -56,14 +56,14 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
 
     override fun onLost(network: Network) {
         super.onLost(network)
-        Log.d(TAG, "Network lost: $network")
+        TyrLogger.d(TAG, "Network lost: $network")
 
         // Cancel any pending lost check (debounce)
         pendingNetworkLostCheck?.let { handler.removeCallbacks(it) }
 
         pendingNetworkLostCheck = Runnable {
             if (!hasNetworkConnectivity(context)) {
-                Log.w(TAG, "All networks lost")
+                TyrLogger.w(TAG, "All networks lost")
                 // Service will handle disconnection gracefully
             }
         }
@@ -84,7 +84,7 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
             else -> "Unknown"
         }
 
-        Log.d(TAG, "Network capabilities changed: $networkType")
+        TyrLogger.d(TAG, "Network capabilities changed: $networkType")
     }
 
     /**
@@ -101,9 +101,9 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
 
         try {
             connectivityManager.registerNetworkCallback(request, this)
-            Log.i(TAG, "Network callback registered")
+            TyrLogger.i(TAG, "Network callback registered")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to register network callback", e)
+            TyrLogger.e(TAG, "Failed to register network callback", e)
         }
     }
 
@@ -121,9 +121,9 @@ class NetworkChangeReceiver(private val context: Context) : ConnectivityManager.
 
         try {
             connectivityManager.unregisterNetworkCallback(this)
-            Log.i(TAG, "Network callback unregistered")
+            TyrLogger.i(TAG, "Network callback unregistered")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to unregister network callback", e)
+            TyrLogger.e(TAG, "Failed to unregister network callback", e)
         }
     }
 

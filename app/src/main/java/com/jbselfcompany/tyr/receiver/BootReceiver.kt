@@ -3,7 +3,7 @@ package com.jbselfcompany.tyr.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.jbselfcompany.tyr.utils.TyrLogger
 import com.jbselfcompany.tyr.TyrApplication
 import com.jbselfcompany.tyr.service.YggmailService
 
@@ -18,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d(TAG, "Boot completed, checking auto-start configuration")
+            TyrLogger.d(TAG,"Boot completed, checking auto-start configuration")
 
             val configRepository = TyrApplication.instance.configRepository
 
@@ -27,10 +27,10 @@ class BootReceiver : BroadcastReceiver() {
                 configRepository.isAutoStartEnabled() &&
                 configRepository.isServiceEnabled()) {
 
-                Log.i(TAG, "Starting Yggmail service on boot")
+                TyrLogger.i(TAG,"Starting Yggmail service on boot")
                 YggmailService.start(context)
             } else {
-                Log.d(TAG, "Auto-start disabled or onboarding not completed")
+                TyrLogger.d(TAG,"Auto-start disabled or onboarding not completed")
             }
         }
     }

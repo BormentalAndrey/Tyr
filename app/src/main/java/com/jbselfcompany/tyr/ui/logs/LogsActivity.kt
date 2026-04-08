@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
+import com.jbselfcompany.tyr.BuildConfig
 import com.jbselfcompany.tyr.R
 import com.jbselfcompany.tyr.TyrApplication
 import com.jbselfcompany.tyr.databinding.ActivityLogsBinding
@@ -60,40 +61,51 @@ class LogsActivity : BaseActivity() {
             return
         }
 
-        try {
-            // Read logcat output filtered by Tyr and Yggmail
-            val process = Runtime.getRuntime().exec("logcat -d -v time")
-            val bufferedReader = BufferedReader(InputStreamReader(process.inputStream))
+        binding.textLogs.text = getString(R.string.loading_logs)
 
-            val logLines = mutableListOf<String>()
-            var line: String?
+        thread {
+            try {
+                // Read logcat output filtered by Tyr and Yggmail
+                val process = Runtime.getRuntime().exec("logcat -d -v time")
+                val bufferedReader = BufferedReader(InputStreamReader(process.inputStream))
 
-            while (bufferedReader.readLine().also { line = it } != null) {
-                // Filter for Tyr and Yggmail related logs
-                if (line?.contains("Tyr") == true ||
-                    line?.contains("Yggmail") == true ||
-                    line?.contains("com.jbselfcompany.tyr") == true) {
-                    logLines.add(line!!)
+                val logLines = mutableListOf<String>()
+                var line: String?
+
+                while (bufferedReader.readLine().also { line = it } != null) {
+                    // Filter for Tyr and Yggmail related logs
+                    if (line?.contains("Tyr") == true ||
+                        line?.contains("Yggmail") == true ||
+                        line?.contains("com.jbselfcompany.tyr") == true) {
+                        logLines.add(line!!)
+                    }
+                }
+
+                bufferedReader.close()
+                process.destroy()
+
+                // Keep last 1000 lines to avoid too much data
+                if (logLines.size > 1000) {
+                    logLines.subList(0, logLines.size - 1000).clear()
+                }
+
+                val text = logLines.joinToString("\n")
+
+                runOnUiThread {
+                    logsText = text
+                    binding.textLogs.text = if (text.isEmpty()) {
+                        getString(R.string.no_logs_available)
+                    } else {
+                        text
+                    }
+                }
+
+            } catch (e: Exception) {
+                runOnUiThread {
+                    binding.textLogs.text = getString(R.string.error_loading_logs, e.message)
+                    logsText = ""
                 }
             }
-
-            bufferedReader.close()
-
-            // Keep last 1000 lines to avoid too much data
-            if (logLines.size > 1000) {
-                logLines.subList(0, logLines.size - 1000).clear()
-            }
-
-            logsText = logLines.joinToString("\n")
-            binding.textLogs.text = if (logsText.isEmpty()) {
-                getString(R.string.no_logs_available)
-            } else {
-                logsText
-            }
-
-        } catch (e: Exception) {
-            binding.textLogs.text = getString(R.string.error_loading_logs, e.message)
-            logsText = ""
         }
     }
 
@@ -258,7 +270,7 @@ class LogsActivity : BaseActivity() {
         try {
             val uri = FileProvider.getUriForFile(
                 this,
-                "com.jbselfcompany.tyr.fileprovider",
+                "${BuildConfig.APPLICATION_ID}.fileprovider",
                 zipFile
             )
 

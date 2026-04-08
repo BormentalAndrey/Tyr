@@ -1,9 +1,10 @@
 package com.jbselfcompany.tyr.utils
 
 import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.util.Base64
-import android.util.Log
+import com.jbselfcompany.tyr.utils.TyrLogger
 import com.jbselfcompany.tyr.data.ConfigRepository
 import org.json.JSONObject
 import java.io.File
@@ -36,7 +37,7 @@ object BackupManager {
     private const val IV_LENGTH = 12
 
     // Backup format version
-    private const val BACKUP_VERSION = 1
+    private const val BACKUP_VERSION = 2
 
     // Backup file extension
     const val BACKUP_FILE_EXTENSION = ".tyrbackup"
@@ -55,7 +56,9 @@ object BackupManager {
         val publicKey: String?,
         val includesDatabase: Boolean,
         val databaseData: String? = null,
-        val onboardingCompleted: Boolean = true
+        val onboardingCompleted: Boolean = true,
+        val includesChatDatabase: Boolean = false,
+        val chatDatabaseData: String? = null
     )
 
     /**
@@ -74,19 +77,20 @@ object BackupManager {
         includeDatabase: Boolean = true
     ): Boolean {
         if (backupPassword.length < 8) {
-            Log.e(TAG, "Backup password must be at least 8 characters")
+            TyrLogger.e(TAG,"Backup password must be at least 8 characters")
             return false
         }
 
         return try {
             val configRepo = ConfigRepository(context)
 
-            // Read database if requested
+            // Read databases if requested
             val databaseData = if (includeDatabase) {
                 readDatabaseAsBase64(context)
             } else {
                 null
             }
+            val chatDatabaseData = readChatDatabaseAsBase64(context)
 
             // Create backup data object
             val backupData = BackupData(
@@ -100,7 +104,9 @@ object BackupManager {
                 publicKey = configRepo.getPublicKey(),
                 includesDatabase = includeDatabase,
                 databaseData = databaseData,
-                onboardingCompleted = configRepo.isOnboardingCompleted()
+                onboardingCompleted = configRepo.isOnboardingCompleted(),
+                includesChatDatabase = chatDatabaseData != null,
+                chatDatabaseData = chatDatabaseData
             )
 
             // Convert to JSON
@@ -117,6 +123,10 @@ object BackupManager {
                 put("onboardingCompleted", backupData.onboardingCompleted)
                 if (backupData.databaseData != null) {
                     put("databaseData", backupData.databaseData)
+                }
+                put("includesChatDatabase", backupData.includesChatDatabase)
+                if (backupData.chatDatabaseData != null) {
+                    put("chatDatabaseData", backupData.chatDatabaseData)
                 }
             }
 
@@ -146,10 +156,10 @@ object BackupManager {
             outputStream.write(ciphertext)
             outputStream.flush()
 
-            Log.i(TAG, "Backup created successfully (size: ${salt.size + iv.size + ciphertext.size} bytes)")
+            TyrLogger.i(TAG,"Backup created successfully (size: ${salt.size + iv.size + ciphertext.size} bytes)")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to create backup", e)
+            TyrLogger.e(TAG,"Failed to create backup", e)
             false
         }
     }
@@ -172,7 +182,7 @@ object BackupManager {
             val encryptedData = inputStream.readBytes()
 
             if (encryptedData.size < SALT_LENGTH + IV_LENGTH + 16) {
-                Log.e(TAG, "Backup file is too small or corrupted")
+                TyrLogger.e(TAG,"Backup file is too small or corrupted")
                 return false
             }
 
@@ -198,7 +208,7 @@ object BackupManager {
             // Validate version
             val version = jsonObject.getInt("version")
             if (version > BACKUP_VERSION) {
-                Log.e(TAG, "Backup version $version is not supported (current version: $BACKUP_VERSION)")
+                TyrLogger.e(TAG,"Backup version $version is not supported (current version: $BACKUP_VERSION)")
                 return false
             }
 
@@ -217,7 +227,9 @@ object BackupManager {
                 publicKey = jsonObject.optString("publicKey").takeIf { it.isNotEmpty() },
                 includesDatabase = jsonObject.optBoolean("includesDatabase", false),
                 databaseData = jsonObject.optString("databaseData").takeIf { it.isNotEmpty() },
-                onboardingCompleted = jsonObject.optBoolean("onboardingCompleted", true)
+                onboardingCompleted = jsonObject.optBoolean("onboardingCompleted", true),
+                includesChatDatabase = jsonObject.optBoolean("includesChatDatabase", false),
+                chatDatabaseData = jsonObject.optString("chatDatabaseData").takeIf { it.isNotEmpty() }
             )
 
             // Restore configuration
@@ -227,7 +239,7 @@ object BackupManager {
                 try {
                     configRepo.savePassword(backupData.password)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to save password during restore", e)
+                    TyrLogger.e(TAG,"Failed to save password during restore", e)
                     return false
                 }
             }
@@ -248,15 +260,20 @@ object BackupManager {
             // Restore onboarding completed flag
             configRepo.setOnboardingCompleted(backupData.onboardingCompleted)
 
-            // Restore database if included
+            // Restore yggmail database if included
             if (backupData.includesDatabase && backupData.databaseData != null) {
                 writeDatabaseFromBase64(context, backupData.databaseData)
             }
 
-            Log.i(TAG, "Backup restored successfully (timestamp: ${backupData.timestamp})")
+            // Restore chat database if included
+            if (backupData.includesChatDatabase && backupData.chatDatabaseData != null) {
+                writeChatDatabaseFromBase64(context, backupData.chatDatabaseData)
+            }
+
+            TyrLogger.i(TAG,"Backup restored successfully (timestamp: ${backupData.timestamp})")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to restore backup", e)
+            TyrLogger.e(TAG,"Failed to restore backup", e)
             false
         }
     }
@@ -272,35 +289,133 @@ object BackupManager {
 
     /**
      * Read yggmail.db and encode as Base64.
+     *
+     * Runs a WAL checkpoint before reading so that all committed transactions
+     * are flushed from the -wal file into the main database file. Without this,
+     * a raw file copy of the .db can be missing recent writes that are still
+     * only in the write-ahead log.
      */
     private fun readDatabaseAsBase64(context: Context): String? {
         return try {
             val dbFile = File(context.filesDir, "yggmail.db")
             if (!dbFile.exists()) {
-                Log.w(TAG, "Database file does not exist")
+                TyrLogger.w(TAG, "Database file does not exist")
                 return null
             }
+
+            // Checkpoint and truncate the WAL so all data is in the main file.
+            checkpointDatabase(dbFile.absolutePath)
 
             val bytes = dbFile.readBytes()
             Base64.encodeToString(bytes, Base64.NO_WRAP)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to read database", e)
+            TyrLogger.e(TAG, "Failed to read database", e)
             null
         }
     }
 
     /**
+     * Read tyr_chat.db and encode as Base64.
+     *
+     * Runs a WAL checkpoint before reading so that all committed transactions
+     * are flushed from the -wal file into the main database file. Without this,
+     * a raw file copy of the .db can be missing recent writes that are still
+     * only in the write-ahead log — causing the backup to appear empty or
+     * out-of-date when restored.
+     */
+    private fun readChatDatabaseAsBase64(context: Context): String? {
+        return try {
+            val dbFile = context.getDatabasePath("tyr_chat.db")
+            if (!dbFile.exists()) {
+                TyrLogger.w(TAG, "Chat database file does not exist")
+                return null
+            }
+
+            // Checkpoint and truncate the WAL so all data is in the main file.
+            checkpointDatabase(dbFile.absolutePath)
+
+            val bytes = dbFile.readBytes()
+            Base64.encodeToString(bytes, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            TyrLogger.e(TAG, "Failed to read chat database", e)
+            null
+        }
+    }
+
+    /**
+     * Checkpoint a WAL-mode SQLite database, flushing all pending writes into
+     * the main database file and truncating the write-ahead log.
+     *
+     * Opens the database read-write (required for checkpointing), executes
+     * PRAGMA wal_checkpoint(TRUNCATE), then closes the connection. This
+     * ensures that a subsequent raw file copy of the .db reflects the full
+     * committed state.
+     */
+    private fun checkpointDatabase(absolutePath: String) {
+        try {
+            SQLiteDatabase.openDatabase(
+                absolutePath,
+                null,
+                SQLiteDatabase.OPEN_READWRITE
+            ).use { db ->
+                db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE)", null).use { cursor ->
+                    // Consume the cursor so the PRAGMA executes to completion.
+                    cursor.moveToFirst()
+                }
+            }
+            TyrLogger.d(TAG, "WAL checkpoint completed for $absolutePath")
+        } catch (e: Exception) {
+            // Non-fatal: the database may not be in WAL mode, or may be
+            // temporarily locked. Log and continue — the backup will still
+            // include whatever is currently in the main file.
+            TyrLogger.w(TAG, "WAL checkpoint failed (non-fatal): ${e.message}")
+        }
+    }
+
+    /**
+     * Write tyr_chat.db from Base64 encoded data.
+     *
+     * Removes any stale -wal and -shm files after writing the restored
+     * database. If leftover WAL files from the old database were present,
+     * SQLite would try to apply them on top of the restored data, corrupting
+     * or overwriting the restored contents.
+     */
+    private fun writeChatDatabaseFromBase64(context: Context, base64Data: String): Boolean {
+        return try {
+            val bytes = Base64.decode(base64Data, Base64.NO_WRAP)
+            val dbFile = context.getDatabasePath("tyr_chat.db")
+            dbFile.parentFile?.mkdirs()
+            dbFile.writeBytes(bytes)
+            // Remove stale WAL artefacts so SQLite starts clean from the restored file.
+            File(dbFile.absolutePath + "-wal").delete()
+            File(dbFile.absolutePath + "-shm").delete()
+            TyrLogger.i(TAG, "Chat database restored successfully")
+            true
+        } catch (e: Exception) {
+            TyrLogger.e(TAG, "Failed to write chat database", e)
+            false
+        }
+    }
+
+    /**
      * Write yggmail.db from Base64 encoded data.
+     *
+     * Removes any stale -wal and -shm files after writing the restored
+     * database so SQLite does not apply old WAL entries on top of the
+     * restored data.
      */
     private fun writeDatabaseFromBase64(context: Context, base64Data: String): Boolean {
         return try {
             val bytes = Base64.decode(base64Data, Base64.NO_WRAP)
             val dbFile = File(context.filesDir, "yggmail.db")
             dbFile.writeBytes(bytes)
-            Log.i(TAG, "Database restored successfully")
+            // Remove stale WAL artefacts so SQLite starts clean from the restored file.
+            File(dbFile.absolutePath + "-wal").delete()
+            File(dbFile.absolutePath + "-shm").delete()
+            TyrLogger.i(TAG, "Database restored successfully")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to write database", e)
+            TyrLogger.e(TAG, "Failed to write database", e)
             false
         }
     }
