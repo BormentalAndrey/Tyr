@@ -1,0 +1,9 @@
+• Share your Tyr address as a one-tap link — recipients add you as a contact and configure a peer instantly
+• Three distinct share options in the QR dialog: share QR image, share as mailto: address, or share as a Tyr deep link
+• Deeplink (tyr://open) now adds peer and chat contact together when a public key is included
+• QR scanner in Add Contact now recognises tyr://open QR codes in addition to mailto:
+• Notifications now open the specific conversation directly
+• Chat attachments moved to Android/data/ — accessible via file manager
+• Storage management in Settings: view usage and clear media cache
+• Media cache size now shown in the Storage & Quota card on the home screen
+• Fixed crash on GrapheneOS (MTE)

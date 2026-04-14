@@ -4,6 +4,7 @@
 
     <!-- Common -->
     <string name="ok">ОК</string>
+    <string name="close">Закрыть</string>
     <string name="cancel">Отмена</string>
     <string name="save">Сохранить</string>
     <string name="next">Далее</string>
@@ -75,7 +76,7 @@
     <string name="copy_address">Копировать</string>
     <string name="show_qr_code">QR-код</string>
     <string name="address_copied">Адрес скопирован в буфер обмена</string>
-    <string name="share_mailto">Поделиться</string>
+    <string name="share_mailto">Поделиться адресом (mailto:)</string>
     <string name="qr_code_title">QR-код почтового адреса</string>
     <string name="qr_code_error">Не удалось создать QR-код</string>
     <string name="setup_deltachat">Настроить DeltaChat/ArcaneChat</string>
@@ -344,6 +345,20 @@
     <string name="storage_db_size">База данных (малые сообщения): %.2f МБ</string>
     <string name="storage_file_size">Файлы (большие сообщения): %.2f МБ</string>
     <string name="storage_total_size">Всего: %.2f МБ</string>
+    <string name="media_cache_label">Медиакеш</string>
+    <string name="storage_media_cache_size">Вложения чатов: %.2f МБ</string>
+
+    <!-- Media Cache -->
+    <string name="clear_media_cache">Очистить медиакеш</string>
+    <string name="clear_media_cache_description">Освободить место, удалив кешированные вложения чатов</string>
+    <string name="media_cache_stats_title">Использование хранилища</string>
+    <string name="media_cache_attachments_size">Вложения чатов: %.2f МБ</string>
+    <string name="media_cache_mail_size">Данные почты (yggmail.db): %.2f МБ</string>
+    <string name="media_cache_total_size">Всего: %.2f МБ</string>
+    <string name="media_cache_clear_confirmation">Удалить все кешированные вложения чатов (%.2f МБ)?\n\nЭто удалит загруженные изображения и файлы из чатов. Сами сообщения сохранятся.</string>
+    <string name="media_cache_cleared">Кеш очищен (освобождено %.2f МБ)</string>
+    <string name="media_cache_nothing_to_clear">Нет кешированных вложений для удаления</string>
+    <string name="media_cache_error">Не удалось очистить кеш</string>
 
     <!-- Outbound Queue -->
     <string name="clear_outbound_queue">Очистить очередь отправки</string>
@@ -360,12 +375,19 @@
     <string name="error_service_not_running">Сервис не запущен</string>
     <string name="error_service_not_available">Сервис недоступен</string>
 
-    <!-- Deeplink peer addition (tyr://open?peer=...) -->
+    <!-- Deeplink handling (tyr://open?peer=...&pubkey=...&name=...) -->
     <string name="deeplink_add_peer_title">Добавить пир</string>
     <string name="deeplink_add_peer_message">Добавить этот пир в Tyr?\n\n%s</string>
     <string name="deeplink_peer_added">Пир добавлен</string>
     <string name="deeplink_peer_already_exists">Этот пир уже настроен</string>
     <string name="deeplink_invalid_peer">Неверный адрес пира</string>
+    <string name="deeplink_add_peer_and_contact_title">Добавить пир и контакт</string>
+    <string name="deeplink_peer_label">Пир:</string>
+    <string name="deeplink_contact_label">Контакт:</string>
+    <string name="deeplink_added_success">Успешно добавлено</string>
+    <string name="deeplink_already_configured">Уже настроено</string>
+    <string name="share_tyr_link">Поделиться ссылкой Tyr</string>
+    <string name="share_qr_image">Поделиться QR-изображением</string>
 
     <!-- Manual peer entry in onboarding -->
     <string name="manual_peer_title">Или введите пир вручную</string>

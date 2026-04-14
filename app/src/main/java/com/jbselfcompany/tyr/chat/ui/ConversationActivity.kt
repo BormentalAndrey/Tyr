@@ -100,7 +100,9 @@ class ConversationActivity : BaseActivity() {
     }
 
     private val attachmentsDir: File
-        get() = File(filesDir, ATTACHMENTS_DIR).also { it.mkdirs() }
+        get() = (getExternalFilesDir(null) ?: filesDir).let {
+            File(it, ATTACHMENTS_DIR).also { dir -> dir.mkdirs() }
+        }
 
     // --- Photo picker launcher ---
 

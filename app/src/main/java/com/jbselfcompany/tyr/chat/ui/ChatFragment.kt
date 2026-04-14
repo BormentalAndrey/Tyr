@@ -234,7 +234,9 @@ class ChatFragment : Fragment() {
         Thread {
             try {
             val sinceUid = chatRepository.getMaxImapUid()
-            val attachmentsDir = java.io.File(filesDir, "attachments").also { it.mkdirs() }
+            val attachmentsDir = java.io.File(
+                appContext.getExternalFilesDir(null) ?: filesDir, "attachments"
+            ).also { it.mkdirs() }
             val result = ImapFetcher(cacheDir = appContext.cacheDir).fetchNewMessages(myAddress, password, sinceUid, attachmentsDir)
             if (result is ImapFetcher.Result.Success) {
                 // Delivery receipts → single checkmark (only if still SENDING)

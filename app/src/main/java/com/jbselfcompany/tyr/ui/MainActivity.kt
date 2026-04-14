@@ -31,10 +31,15 @@ import com.jbselfcompany.tyr.utils.NetworkStatsMonitor
 import com.jbselfcompany.tyr.utils.UpdateChecker
 import com.jbselfcompany.tyr.data.PeerInfo
 import com.jbselfcompany.tyr.utils.PermissionManager
+import com.jbselfcompany.tyr.chat.data.ChatContact
 import com.jbselfcompany.tyr.chat.data.ChatRepository
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.widget.ImageView
+import androidx.core.content.FileProvider
+import com.google.android.material.button.MaterialButton
+import java.io.File
+import java.io.FileOutputStream
 import androidx.lifecycle.lifecycleScope
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -454,34 +459,54 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
 
     private fun showQrCodeDialog(mailAddress: String) {
         try {
-            // Generate mailto URL
             val mailtoUrl = "mailto:$mailAddress"
-
-            // Generate QR code
             val qrBitmap = generateQrCode(mailtoUrl, 512, 512)
 
-            // Create ImageView for QR code
-            val imageView = ImageView(this).apply {
-                setImageBitmap(qrBitmap)
-                setPadding(32, 32, 32, 32)
-            }
+            val dialogView = layoutInflater.inflate(R.layout.dialog_qr_code, null)
+            dialogView.findViewById<ImageView>(R.id.imageViewQr).setImageBitmap(qrBitmap)
+            dialogView.findViewById<MaterialButton>(R.id.buttonShareQrImage)
+                .setOnClickListener { shareQrImage(qrBitmap) }
+            dialogView.findViewById<MaterialButton>(R.id.buttonShareMailto)
+                .setOnClickListener { shareMailto(mailtoUrl) }
+            dialogView.findViewById<MaterialButton>(R.id.buttonShareTyrLink)
+                .setOnClickListener { shareTyrLink(mailAddress) }
 
-            // Show dialog
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.qr_code_title)
-                .setView(imageView)
-                .setPositiveButton(R.string.ok, null)
-                .setNeutralButton(R.string.share_mailto) { _, _ ->
-                    shareMailto(mailtoUrl)
-                }
+                .setView(dialogView)
+                .setPositiveButton(R.string.close, null)
                 .show()
         } catch (e: Exception) {
             TyrLogger.e("MainActivity", "Error generating QR code", e)
-            Snackbar.make(
-                binding.root,
-                R.string.qr_code_error,
-                Snackbar.LENGTH_SHORT
-            ).show()
+            Snackbar.make(binding.root, R.string.qr_code_error, Snackbar.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * Share a tyr://open deeplink containing the user's pubkey and an optional peer suggestion.
+     * Recipients who have Tyr installed can tap the link to add the sender as a contact in one step.
+     */
+    private fun shareTyrLink(mailAddress: String) {
+        try {
+            val pubkey = mailAddress.substringBefore("@")
+            val firstEnabledPeer = configRepository.getAllPeersInfo().firstOrNull { it.isEnabled }?.uri
+            val tyrUrl = buildString {
+                append("tyr://open?pubkey=")
+                append(pubkey)
+                if (firstEnabledPeer != null) {
+                    append("&peer=")
+                    append(Uri.encode(firstEnabledPeer))
+                }
+            }
+            val sendIntent = Intent().apply {
+                action = Intent.ACTION_SEND
+                putExtra(Intent.EXTRA_TEXT, tyrUrl)
+                type = "text/plain"
+            }
+            startActivity(Intent.createChooser(sendIntent, null))
+        } catch (e: Exception) {
+            TyrLogger.e("MainActivity", "Error sharing Tyr link", e)
+            Snackbar.make(binding.root, R.string.qr_code_error, Snackbar.LENGTH_SHORT).show()
         }
     }
 
@@ -501,6 +526,23 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                 R.string.qr_code_error,
                 Snackbar.LENGTH_SHORT
             ).show()
+        }
+    }
+
+    private fun shareQrImage(qrBitmap: Bitmap) {
+        try {
+            val file = File(cacheDir, "qr_share.png")
+            FileOutputStream(file).use { qrBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(sendIntent, null))
+        } catch (e: Exception) {
+            TyrLogger.e("MainActivity", "Error sharing QR image", e)
+            Snackbar.make(binding.root, R.string.qr_code_error, Snackbar.LENGTH_SHORT).show()
         }
     }
 
@@ -839,9 +881,13 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
     }
 
     /**
-     * Handle tyr://open?peer=<url> deeplink.
-     * Shows a confirmation dialog before adding the peer.
-     * ConfigRepository is SharedPreferences-backed and does not depend on service binding.
+     * Handle tyr://open deeplink. Supports parameters:
+     *   peer=<url>    — Yggdrasil peer URL to add
+     *   pubkey=<hex>  — 64-char Ed25519 public key to add as chat contact
+     *   name=<str>    — optional display name for the contact
+     *
+     * Any combination is valid: peer-only, pubkey-only, or both.
+     * Shows a confirmation dialog before making any changes.
      */
     private fun handleDeeplinkIntent(intent: Intent?) {
         if (!configRepository.isOnboardingCompleted()) return
@@ -852,34 +898,76 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
         // Clear intent data immediately to prevent replay on configuration change (e.g. rotation)
         setIntent(intent.apply { data = null })
 
-        val peerUrl = uri.getQueryParameter("peer")?.trim() ?: return
-        if (peerUrl.isBlank()) return
+        val peerUrl = uri.getQueryParameter("peer")?.trim()
+        val pubkey = uri.getQueryParameter("pubkey")?.trim()
+        val contactName = uri.getQueryParameter("name")?.trim()
 
-        // Validate full URL (protocol + host:port content) using shared validator
-        if (!PeerInfo.isValidPeerUrl(peerUrl)) {
-            Snackbar.make(binding.root, R.string.deeplink_invalid_peer, Snackbar.LENGTH_SHORT).show()
+        val hasValidPeer = !peerUrl.isNullOrBlank() && PeerInfo.isValidPeerUrl(peerUrl)
+        val hasValidPubkey = !pubkey.isNullOrBlank() && isValidPubkey(pubkey)
+
+        if (!hasValidPeer && !hasValidPubkey) {
+            if (!peerUrl.isNullOrBlank()) {
+                Snackbar.make(binding.root, R.string.deeplink_invalid_peer, Snackbar.LENGTH_SHORT).show()
+            }
             return
         }
 
-        // Check if peer already exists
-        if (configRepository.getAllPeersInfo().any { it.uri == peerUrl }) {
-            Snackbar.make(binding.root, R.string.deeplink_peer_already_exists, Snackbar.LENGTH_SHORT).show()
+        val peerAlreadyExists = hasValidPeer && configRepository.getAllPeersInfo().any { it.uri == peerUrl }
+        val contactAddress = if (hasValidPubkey) "$pubkey@yggmail" else null
+
+        // Prevent adding own address as a contact (same guard as the manual AddContact flow).
+        // Without this, opening your own tyr://open link adds yourself as a contact, and
+        // deleting it wipes all messages (deleteContact deletes by address which matches every row).
+        val isSelfContact = contactAddress?.equals(configRepository.getMailAddress(), ignoreCase = true) == true
+        val effectiveHasValidPubkey = hasValidPubkey && !isSelfContact
+
+        val contactAlreadyExists = contactAddress != null && !isSelfContact &&
+            ChatRepository(this).contactExists(contactAddress)
+
+        // Nothing new to add
+        if ((!hasValidPeer || peerAlreadyExists) && (!effectiveHasValidPubkey || contactAlreadyExists)) {
+            Snackbar.make(binding.root, R.string.deeplink_already_configured, Snackbar.LENGTH_SHORT).show()
             return
         }
 
-        // Show confirmation dialog before adding
+        val title = if (effectiveHasValidPubkey) R.string.deeplink_add_peer_and_contact_title else R.string.deeplink_add_peer_title
+        val message = buildString {
+            if (hasValidPeer && !peerAlreadyExists) {
+                append(getString(R.string.deeplink_peer_label))
+                append("\n")
+                append(peerUrl)
+            }
+            if (effectiveHasValidPubkey && !contactAlreadyExists) {
+                if (isNotEmpty()) append("\n\n")
+                append(getString(R.string.deeplink_contact_label))
+                append("\n")
+                if (!contactName.isNullOrBlank()) append("$contactName\n")
+                append(contactAddress)
+            }
+        }
+
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.deeplink_add_peer_title)
-            .setMessage(getString(R.string.deeplink_add_peer_message, peerUrl))
+            .setTitle(title)
+            .setMessage(message)
             .setPositiveButton(R.string.add) { _, _ ->
-                configRepository.savePeer(
-                    PeerInfo(uri = peerUrl, isEnabled = true, tag = PeerInfo.PeerTag.CUSTOM)
-                )
-                Snackbar.make(binding.root, R.string.deeplink_peer_added, Snackbar.LENGTH_SHORT).show()
+                if (hasValidPeer && !peerAlreadyExists) {
+                    configRepository.savePeer(
+                        PeerInfo(uri = peerUrl!!, isEnabled = true, tag = PeerInfo.PeerTag.CUSTOM)
+                    )
+                }
+                if (effectiveHasValidPubkey && !contactAlreadyExists) {
+                    val name = contactName?.takeIf { it.isNotBlank() } ?: pubkey!!.take(8)
+                    ChatRepository(this).addContact(ChatContact(address = contactAddress!!, name = name))
+                }
+                Snackbar.make(binding.root, R.string.deeplink_added_success, Snackbar.LENGTH_SHORT).show()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
+
+    /** Returns true if [key] is a valid 64-char lowercase hex Ed25519 public key. */
+    private fun isValidPubkey(key: String): Boolean =
+        key.length == 64 && key.all { it in '0'..'9' || it in 'a'..'f' }
 
     /**
      * Convert dp to pixels
@@ -950,6 +1038,14 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
             val maxSizeInfo = yggmailService?.getMaxMessageSizeInfo()
             val storageStats = yggmailService?.getMailStorageStats()
 
+            // Calculate media cache size (chat attachments in external or internal files dir)
+            val attachmentsDir = java.io.File(
+                getExternalFilesDir(null) ?: filesDir, "attachments"
+            )
+            val mediaCacheSizeMB = attachmentsDir.walkTopDown()
+                .filter { it.isFile }
+                .sumOf { it.length() } / (1024.0 * 1024.0)
+
             withContext(Dispatchers.Main) {
                 if (maxSizeInfo == null || storageStats == null) return@withContext
 
@@ -964,6 +1060,8 @@ class MainActivity : BaseActivity(), ServiceStatusListener {
                     append(getString(R.string.storage_total_size, storageStats.totalSizeMB))
                 }
                 binding.textStorageInfo.text = storageText
+
+                binding.textMediaCacheInfo.text = getString(R.string.storage_media_cache_size, mediaCacheSizeMB)
             }
         }
     }

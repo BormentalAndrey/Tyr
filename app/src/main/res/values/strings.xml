@@ -4,6 +4,7 @@
 
     <!-- Common -->
     <string name="ok">OK</string>
+    <string name="close">Close</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
     <string name="next">Next</string>
@@ -74,7 +75,7 @@
     <string name="copy_address">Copy</string>
     <string name="show_qr_code">QR Code</string>
     <string name="address_copied">Address copied to clipboard</string>
-    <string name="share_mailto">Share</string>
+    <string name="share_mailto">Share Address (mailto:)</string>
     <string name="qr_code_title">Mail Address QR Code</string>
     <string name="qr_code_error">Failed to generate QR code</string>
     <string name="setup_deltachat">Setup DeltaChat/ArcaneChat</string>
@@ -343,6 +344,20 @@
     <string name="storage_db_size">Database (small messages): %.2f MB</string>
     <string name="storage_file_size">Files (large messages): %.2f MB</string>
     <string name="storage_total_size">Total: %.2f MB</string>
+    <string name="media_cache_label">Media Cache</string>
+    <string name="storage_media_cache_size">Chat attachments: %.2f MB</string>
+
+    <!-- Media Cache -->
+    <string name="clear_media_cache">Clear Media Cache</string>
+    <string name="clear_media_cache_description">Free up space by deleting cached chat attachments</string>
+    <string name="media_cache_stats_title">Storage Usage</string>
+    <string name="media_cache_attachments_size">Chat attachments: %.2f MB</string>
+    <string name="media_cache_mail_size">Mail data (yggmail.db): %.2f MB</string>
+    <string name="media_cache_total_size">Total: %.2f MB</string>
+    <string name="media_cache_clear_confirmation">Delete all cached chat attachments (%.2f MB)?\n\nThis removes downloaded images and files from chats. Original messages are kept.</string>
+    <string name="media_cache_cleared">Cache cleared (%.2f MB freed)</string>
+    <string name="media_cache_nothing_to_clear">No cached attachments to clear</string>
+    <string name="media_cache_error">Failed to clear cache</string>
 
     <!-- Outbound Queue -->
     <string name="clear_outbound_queue">Clear Outbound Queue</string>
@@ -359,12 +374,19 @@
     <string name="error_service_not_running">Service is not running</string>
     <string name="error_service_not_available">Service is not available</string>
 
-    <!-- Deeplink peer addition (tyr://open?peer=...) -->
+    <!-- Deeplink handling (tyr://open?peer=...&pubkey=...&name=...) -->
     <string name="deeplink_add_peer_title">Add Peer</string>
     <string name="deeplink_add_peer_message">Add this peer to Tyr?\n\n%s</string>
     <string name="deeplink_peer_added">Peer added</string>
     <string name="deeplink_peer_already_exists">This peer is already configured</string>
     <string name="deeplink_invalid_peer">Invalid peer address</string>
+    <string name="deeplink_add_peer_and_contact_title">Add Peer &amp; Contact</string>
+    <string name="deeplink_peer_label">Peer:</string>
+    <string name="deeplink_contact_label">Contact:</string>
+    <string name="deeplink_added_success">Added successfully</string>
+    <string name="deeplink_already_configured">Already configured</string>
+    <string name="share_tyr_link">Share Tyr Link</string>
+    <string name="share_qr_image">Share QR Image</string>
 
     <!-- Manual peer entry in onboarding -->
     <string name="manual_peer_title">Or enter peer manually</string>

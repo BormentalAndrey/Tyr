@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="8dp">
+
+    <ImageView
+        android:id="@+id/imageViewQr"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:contentDescription="@string/qr_code_title" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonShareQrImage"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/share_qr_image"
+        app:icon="@drawable/ic_image" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonShareMailto"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/share_mailto"
+        app:icon="@drawable/ic_send" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/buttonShareTyrLink"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/share_tyr_link"
+        app:icon="@drawable/ic_link" />
+
+</LinearLayout>

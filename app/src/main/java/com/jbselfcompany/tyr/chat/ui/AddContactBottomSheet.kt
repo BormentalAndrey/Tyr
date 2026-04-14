@@ -1,5 +1,6 @@
 package com.jbselfcompany.tyr.chat.ui
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -23,6 +24,14 @@ class AddContactBottomSheet : BottomSheetDialogFragment() {
     private val qrLauncher = registerForActivityResult(ScanContract()) { result: ScanIntentResult ->
         val scanned = result.contents?.trim() ?: return@registerForActivityResult
         val address = when {
+            // tyr://open?pubkey=<hex>[&peer=...][&name=...] — Tyr contact sharing deeplink
+            scanned.startsWith("tyr://open", ignoreCase = true) -> {
+                val uri = Uri.parse(scanned)
+                val pubkey = uri.getQueryParameter("pubkey")?.trim() ?: ""
+                if (pubkey.length == 64 && pubkey.all { it in '0'..'9' || it in 'a'..'f' }) {
+                    "$pubkey@yggmail"
+                } else ""
+            }
             scanned.startsWith("mailto:", ignoreCase = true) ->
                 scanned.removePrefix("mailto:").substringBefore("?").trim()
             scanned.contains("@") -> scanned.trim()

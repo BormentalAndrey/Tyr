@@ -835,8 +835,6 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
                 val dialogView = layoutInflater.inflate(R.layout.dialog_unread_quota, null)
                 val slider = dialogView.findViewById<com.google.android.material.slider.Slider>(R.id.quota_slider)
                 val textCurrent = dialogView.findViewById<android.widget.TextView>(R.id.text_current_quota)
-                val textStorageStats = dialogView.findViewById<android.widget.TextView>(R.id.text_storage_stats)
-
                 // Configure slider (10 MB - 500 MB, step 10 MB)
                 slider.valueFrom = 10f
                 slider.valueTo = 500f
@@ -845,20 +843,6 @@ class SettingsActivity : BaseActivity(), SettingsAdapter.Listener {
 
                 // Update current max size text
                 textCurrent.text = getString(R.string.quota_current_value, maxSizeInfo.maxSizeMB)
-
-                // Update storage statistics
-                if (storageStats != null) {
-                    val statsText = buildString {
-                        append(getString(R.string.storage_db_size, storageStats.dbSizeMB))
-                        append("\n")
-                        append(getString(R.string.storage_file_size, storageStats.fileSizeMB))
-                        append("\n")
-                        append(getString(R.string.storage_total_size, storageStats.totalSizeMB))
-                    }
-                    textStorageStats.text = statsText
-                } else {
-                    textStorageStats.text = getString(R.string.error_loading_storage_stats)
-                }
 
                 // Update text when slider changes
                 slider.addOnChangeListener { _, value, _ ->

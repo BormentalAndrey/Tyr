@@ -25,23 +25,6 @@
         android:valueTo="500"
         android:stepSize="10"
         android:value="10"
-        app:labelBehavior="floating"
-        android:layout_marginBottom="24dp" />
-
-    <!-- Storage Statistics Section -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/storage_statistics"
-        android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
-        android:layout_marginBottom="8dp" />
-
-    <!-- Storage stats text -->
-    <TextView
-        android:id="@+id/text_storage_stats"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-        android:lineSpacingExtra="4dp" />
+        app:labelBehavior="floating" />
 
 </LinearLayout>

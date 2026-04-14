@@ -1601,7 +1601,9 @@ class YggmailService : Service(), LogCallback, mobile.MailCallback {
                 val watermark = configRepository.getLastSeenImapUid()
                 val sinceUid = maxOf(dbMaxUid, watermark)
                 TyrLogger.i(TAG, "Chat poll: starting fetch sinceUid=$sinceUid (db=$dbMaxUid watermark=$watermark) address=$address")
-                val attachmentsDir = File(filesDir, "attachments").also { it.mkdirs() }
+                val attachmentsDir = File(
+                    getExternalFilesDir(null) ?: filesDir, "attachments"
+                ).also { it.mkdirs() }
                 val result = ImapFetcher(cacheDir = cacheDir).fetchNewMessages(address, password, sinceUid, attachmentsDir)
                 when (result) {
                     is ImapFetcher.Result.Error -> {
@@ -1748,14 +1750,24 @@ class YggmailService : Service(), LogCallback, mobile.MailCallback {
             val contact = chatRepository.getContact(fromAddr)
             val senderName = if (!contact?.name.isNullOrBlank()) contact!!.name else fromAddr
 
-            val intent = Intent(this, MainActivity::class.java).apply {
+            val conversationIntent = Intent(
+                this,
+                com.jbselfcompany.tyr.chat.ui.ConversationActivity::class.java
+            ).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra(MainActivity.EXTRA_TAB, MainActivity.TAB_CHAT)
+                putExtra(
+                    com.jbselfcompany.tyr.chat.ui.ConversationActivity.EXTRA_CONTACT_ADDRESS,
+                    fromAddr
+                )
+                putExtra(
+                    com.jbselfcompany.tyr.chat.ui.ConversationActivity.EXTRA_CONTACT_NAME,
+                    contact?.name ?: ""
+                )
             }
             val pendingIntent = PendingIntent.getActivity(
                 this,
                 CHAT_NOTIFICATION_BASE_ID + fromAddr.hashCode(),
-                intent,
+                conversationIntent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 

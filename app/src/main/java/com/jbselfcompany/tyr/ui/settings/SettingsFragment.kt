@@ -74,6 +74,9 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
         // Chat settings
         private const val ID_HEADER_CHAT = 26
         private const val ID_ACCEPT_NON_CONTACTS = 27
+
+        // Media cache
+        private const val ID_CLEAR_MEDIA_CACHE = 28
     }
 
     private var backupPassword: String = ""
@@ -226,6 +229,14 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
                 type = SettingsAdapter.ItemType.PLAIN
             )
         )
+        settingsItems.add(
+            SettingsAdapter.Item(
+                id = ID_CLEAR_MEDIA_CACHE,
+                titleRes = R.string.clear_media_cache,
+                descriptionRes = R.string.clear_media_cache_description,
+                type = SettingsAdapter.ItemType.PLAIN
+            )
+        )
 
         // Appearance Settings Section
         settingsItems.add(
@@ -369,6 +380,7 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
             ID_BACKUP_RESTORE -> showBackupRestoreOptions()
             ID_UNREAD_QUOTA -> showUnreadQuotaDialog()
             ID_CLEAR_OUTBOUND_QUEUE -> showClearOutboundQueueDialog()
+            ID_CLEAR_MEDIA_CACHE -> showClearMediaCacheDialog()
             ID_LANGUAGE -> showLanguageDialog()
             ID_THEME -> showThemeDialog()
             ID_COLLECT_LOGS -> startActivity(Intent(requireContext(), LogsActivity::class.java))
@@ -817,7 +829,6 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
 
         Thread {
             val maxSizeInfo = service.getMaxMessageSizeInfo()
-            val storageStats = service.getMailStorageStats()
 
             requireActivity().runOnUiThread {
                 if (!isAdded) return@runOnUiThread
@@ -832,8 +843,6 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
                 val dialogView = requireActivity().layoutInflater.inflate(R.layout.dialog_unread_quota, null)
                 val slider = dialogView.findViewById<com.google.android.material.slider.Slider>(R.id.quota_slider)
                 val textCurrent = dialogView.findViewById<android.widget.TextView>(R.id.text_current_quota)
-                val textStorageStats = dialogView.findViewById<android.widget.TextView>(R.id.text_storage_stats)
-
                 // Configure slider (10 MB - 500 MB, step 10 MB)
                 slider.valueFrom = 10f
                 slider.valueTo = 500f
@@ -842,20 +851,6 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
 
                 // Update current max size text
                 textCurrent.text = getString(R.string.quota_current_value, maxSizeInfo.maxSizeMB)
-
-                // Update storage statistics
-                if (storageStats != null) {
-                    val statsText = buildString {
-                        append(getString(R.string.storage_db_size, storageStats.dbSizeMB))
-                        append("\n")
-                        append(getString(R.string.storage_file_size, storageStats.fileSizeMB))
-                        append("\n")
-                        append(getString(R.string.storage_total_size, storageStats.totalSizeMB))
-                    }
-                    textStorageStats.text = statsText
-                } else {
-                    textStorageStats.text = getString(R.string.error_loading_storage_stats)
-                }
 
                 // Update text when slider changes
                 slider.addOnChangeListener { _, value, _ ->
@@ -969,6 +964,82 @@ class SettingsFragment : Fragment(), SettingsAdapter.Listener {
                         getString(R.string.queue_cleared, cleared),
                         Toast.LENGTH_SHORT
                     ).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun showClearMediaCacheDialog() {
+        showLoadingOverlay(true, getString(R.string.loading_storage_stats))
+
+        Thread {
+            val appContext = context?.applicationContext
+            if (appContext == null) {
+                requireActivity().runOnUiThread { showLoadingOverlay(false) }
+                return@Thread
+            }
+
+            // Attachments live in getExternalFilesDir(null)/attachments (or filesDir/attachments
+            // as fallback), matching the paths used in ConversationActivity and ChatFragment.
+            val attachmentsDir = java.io.File(
+                appContext.getExternalFilesDir(null) ?: appContext.filesDir, "attachments"
+            )
+            val attachmentsSizeBytes = attachmentsDir.walkTopDown()
+                .filter { it.isFile }
+                .sumOf { it.length() }
+            val attachmentsSizeMB = attachmentsSizeBytes / (1024.0 * 1024.0)
+
+            requireActivity().runOnUiThread {
+                if (!isAdded) return@runOnUiThread
+                showLoadingOverlay(false)
+
+                val builder = MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.clear_media_cache)
+                    .setMessage(R.string.clear_media_cache_description)
+
+                if (attachmentsSizeBytes > 0) {
+                    builder.setPositiveButton(getString(R.string.clear_media_cache)) { _, _ ->
+                        performClearMediaCache(attachmentsDir, attachmentsSizeMB)
+                    }
+                    builder.setNegativeButton(R.string.cancel, null)
+                } else {
+                    builder.setMessage(R.string.media_cache_nothing_to_clear)
+                    builder.setPositiveButton(R.string.ok, null)
+                }
+
+                builder.show()
+            }
+        }.start()
+    }
+
+    private fun performClearMediaCache(attachmentsDir: java.io.File, sizeMB: Double) {
+        Thread {
+            var freedBytes = 0L
+            var success = true
+            try {
+                if (attachmentsDir.exists()) {
+                    attachmentsDir.walkTopDown()
+                        .filter { it.isFile }
+                        .forEach { file ->
+                            freedBytes += file.length()
+                            file.delete()
+                        }
+                }
+            } catch (e: Exception) {
+                success = false
+            }
+
+            val freedMB = freedBytes / (1024.0 * 1024.0)
+            requireActivity().runOnUiThread {
+                if (!isAdded) return@runOnUiThread
+                if (success) {
+                    Toast.makeText(
+                        requireContext(),
+                        getString(R.string.media_cache_cleared, freedMB),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(requireContext(), R.string.media_cache_error, Toast.LENGTH_SHORT).show()
                 }
             }
         }.start()
