@@ -158,8 +158,12 @@ class AutoconfigServer(private val context: Context) {
      */
     private fun cleanExpiredTokens() {
         val now = System.currentTimeMillis()
-        tokens.entries.removeIf { (_, timestamp) ->
-            now - timestamp > TOKEN_EXPIRY_MS
+        val iterator = tokens.entries.iterator()
+        while (iterator.hasNext()) {
+            val (_, timestamp) = iterator.next()
+            if (now - timestamp > TOKEN_EXPIRY_MS) {
+                iterator.remove()
+            }
         }
     }
 
