@@ -1698,12 +1698,16 @@ class YggmailService : Service(), LogCallback, mobile.MailCallback {
                         // which meant delivery-receipt status updates (SENDING→SENT) were
                         // invisible until the user manually triggered a reload.
                         if (deliveryReceiptsApplied) {
-                            sendBroadcast(Intent(ACTION_NEW_CHAT_MESSAGES))
+                            sendBroadcast(Intent(ACTION_NEW_CHAT_MESSAGES).apply {
+                                setPackage(packageName)
+                            })
                             TyrLogger.d(TAG, "Chat poll: delivery receipts applied, broadcast sent")
                         }
                         if (newMessages.isNotEmpty()) {
                             showChatNotifications(newMessages, chatRepository)
-                            sendBroadcast(Intent(ACTION_NEW_CHAT_MESSAGES))
+                            sendBroadcast(Intent(ACTION_NEW_CHAT_MESSAGES).apply {
+                                setPackage(packageName)
+                            })
                             TyrLogger.i(TAG, "Chat poll: ${newMessages.size} new message(s) inserted, broadcast sent")
 
                             // Send automatic delivery receipts so sender gets single checkmark
