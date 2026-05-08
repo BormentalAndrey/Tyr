@@ -86,7 +86,11 @@ class YggmailService : Service(), LogCallback, mobile.MailCallback {
                 action = ACTION_START
             }
             try {
-                context.startForegroundService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             } catch (e: Exception) {
                 // Android 12+ may throw ForegroundServiceStartNotAllowedException
                 // if app is in background or doesn't meet other foreground service requirements
