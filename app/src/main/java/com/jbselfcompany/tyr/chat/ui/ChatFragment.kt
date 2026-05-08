@@ -295,7 +295,9 @@ class ChatFragment : Fragment() {
                     // previously this was missing, causing the open conversation to stay
                     // stale until the YggmailService 2-minute poll fired.
                     appContext.sendBroadcast(
-                        android.content.Intent(YggmailService.ACTION_NEW_CHAT_MESSAGES)
+                        android.content.Intent(YggmailService.ACTION_NEW_CHAT_MESSAGES).apply {
+                            setPackage(appContext.packageName)
+                        }
                     )
                     activity?.runOnUiThread {
                         refreshContactList()
