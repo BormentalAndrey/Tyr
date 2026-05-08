@@ -584,7 +584,7 @@ class PeersActivity : BaseActivity(), ServiceStatusListener {
             addUpdateListener { animator ->
                 val value = animator.animatedValue as Int
                 currentProgress = value
-                discoveryProgressBar?.setProgress(value, false)
+                discoveryProgressBar?.progress = value
                 discoveryProgressText?.text = getString(R.string.peer_discovery_progress_percent, value)
             }
 
