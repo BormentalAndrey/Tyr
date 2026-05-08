@@ -87,7 +87,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:src="@drawable/ic_file"
-                    android:tint="?attr/colorOnPrimaryContainer"
+                    app:tint="?attr/colorOnPrimaryContainer"
                     android:contentDescription="@null" />
 
                 <LinearLayout
@@ -154,7 +154,7 @@
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_marginStart="3dp"
-                android:tint="?attr/colorOnPrimaryContainer"
+                app:tint="?attr/colorOnPrimaryContainer"
                 android:alpha="0.8"
                 android:contentDescription="@string/chat_message_status_desc"
                 tools:src="@drawable/ic_check_single" />
