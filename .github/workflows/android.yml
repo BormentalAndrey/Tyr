@@ -1,4 +1,4 @@
-name: Android CI Build
+name: Tyr CI Build
 
 on:
   push:
@@ -8,34 +8,53 @@ on:
 
 jobs:
   build:
-    name: Build and Test
+    name: Build & Test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout the code
+      - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Полезно для версионирования, если оно зависит от git-тегов
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17' # Для AGP 8.x рекомендуется JDK 17 или 21
+          java-version: '17'
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Grant execute permission for gradlew
+      - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
+      # Проверка синтаксиса и потенциальных ошибок
       - name: Run Lint
         run: ./gradlew lintDebug
 
+      # Запуск Unit-тестов
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest
 
-      - name: Build Debug APK
+      # Сборка Debug версии (со всеми ABI сплитами)
+      - name: Build Debug APKs
         run: ./gradlew assembleDebug
 
-      - name: Upload APK
+      # Сборка Release версии (без подписи, для проверки R8/ProGuard)
+      - name: Build Unsigned Release APKs
+        run: ./gradlew assembleRelease
+
+      # Загрузка всех сгенерированных APK (Debug)
+      - name: Upload Debug APKs
         uses: actions/upload-artifact@v4
         with:
-          name: tyr-app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Tyr-Debug-Builds
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+      # Загрузка Release APK (они будут не подписаны)
+      - name: Upload Release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tyr-Release-Unsigned
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 7
