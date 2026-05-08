@@ -310,7 +310,7 @@ class OnboardingPeersFragment : Fragment() {
                 }
                 val value = animator.animatedValue as Int
                 currentProgress = value
-                binding.progressBar.setProgress(value, false)
+                binding.progressBar.progress = value
                 binding.textProgress.text = getString(R.string.peer_discovery_progress_percent, value)
             }
 
